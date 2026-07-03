@@ -1,0 +1,26 @@
+[paths]
+data_dir = "./data/ah_disclosure"
+
+[cache]
+ttl_days = 7
+akshare_ttl_days = 7
+cninfo_ttl_days = 1
+hkex_ttl_days = 1
+resolver_ttl_days = 90
+
+[pdf]
+default_ingest_mode = "auto"
+generate_markdown = false
+generate_full_text = false
+generate_pages_jsonl = true
+extract_tables = "auto"
+ocr = "auto"
+build_vector_index = false
+layout_mode = "auto"
+
+[llm]
+default_context_max_chars = 12000
+default_context_max_pages = 8
+
+[logging]
+level = "INFO"

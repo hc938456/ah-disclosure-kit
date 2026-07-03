@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ah-disclosure-kit"
+version = "1.0.0"
+description = "A/H-share disclosure documents, non-trading company data, PDF ingest, local search, and MCP tools."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "ah-disclosure contributors" }]
+keywords = ["a-share", "h-share", "hkex", "cninfo", "prospectus", "pdf", "mcp", "finance"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Office/Business :: Financial",
+  "Topic :: Text Processing :: Indexing",
+]
+dependencies = [
+  "akshare>=1.16.0",
+  "pandas>=2.0.0",
+  "requests>=2.31.0",
+  "httpx>=0.27.0",
+  "beautifulsoup4>=4.12.0",
+  "lxml>=5.0.0",
+  "mcp>=1.7.0",
+  "openpyxl>=3.1.0",
+]
+
+[project.optional-dependencies]
+pdf = ["pymupdf>=1.24.0", "pymupdf4llm>=0.0.17", "pypdf>=4.0.0"]
+table = ["pdfplumber>=0.11.0", "camelot-py>=0.11.0", "opencv-python>=4.8.0"]
+ocr = ["pytesseract>=0.3.10"]
+vector = ["chromadb>=0.5.0", "sentence-transformers>=3.0.0"]
+dev = ["pytest>=8.0.0", "ruff>=0.5.0", "mypy>=1.8.0"]
+all = [
+  "pymupdf>=1.24.0", "pymupdf4llm>=0.0.17", "pypdf>=4.0.0",
+  "pdfplumber>=0.11.0", "camelot-py>=0.11.0", "opencv-python>=4.8.0",
+  "pytesseract>=0.3.10", "chromadb>=0.5.0", "sentence-transformers>=3.0.0",
+  "pytest>=8.0.0", "ruff>=0.5.0", "mypy>=1.8.0",
+]
+
+[project.scripts]
+ah-disclosure = "ah_disclosure.cli:main"
+ah-disclosure-mcp = "ah_disclosure.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
