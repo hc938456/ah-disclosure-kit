@@ -9,7 +9,7 @@
 
 A local Python and MCP toolkit for A-share and H-share disclosures. It retrieves structured company data, locates and downloads annual reports, announcements, and prospectuses, ingests PDFs into a searchable local index, and supplies traceable evidence and verified calculations for AI-assisted financial analysis.
 
-> Current release: [`v1.1.0`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.0)
+> Current release: [`v1.1.1`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.1)
 >
 > This is not a market-data or trading-decision system. It does not provide real-time quotes, charts, order books, market timing, or investment advice.
 
@@ -50,7 +50,7 @@ Responsibility boundary:
 Download this asset from the [latest release](https://github.com/hc938456/ah-disclosure-kit/releases/latest):
 
 ```text
-ah-disclosure-kit-v1.1.0.zip
+ah-disclosure-kit-v1.1.1.zip
 ```
 
 Extract it to a stable directory, then run in Windows PowerShell:
@@ -80,7 +80,7 @@ The installer:
 
 The installer does not install Python, does not install the system-level Tesseract executable, and does not create a `.venv`. If you do not activate a virtual environment first, it modifies the Python environment currently selected by `python`. It uses an editable installation, so keep the extracted source directory in place. If you move it, rerun the installer.
 
-The explicit `-SkillInstallRoot` keeps the command compatible with the `v1.1.0` release asset and the current `main` branch. Current `main` also uses `%USERPROFILE%\.agents\skills` as its default.
+The explicit `-SkillInstallRoot` makes the intended Skill scope visible. The installer also uses `%USERPROFILE%\.agents\skills` as its default.
 
 ### Option 2: install from source
 
@@ -157,7 +157,7 @@ codex mcp list
 Expected version:
 
 ```text
-1.1.0
+1.1.1
 ```
 
 Treat the `data_dir` returned by `server-info` as authoritative. Do not infer it from the shell's current working directory.
@@ -280,6 +280,6 @@ The project is available under the [MIT License](./LICENSE). Use of source data 
 
 ## Release
 
-- Latest stable version: [`v1.1.0`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.0)
+- Latest stable version: [`v1.1.1`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.1)
 - Full change history: [CHANGELOG.md](./CHANGELOG.md)
 - Feedback and bug reports: [GitHub Issues](https://github.com/hc938456/ah-disclosure-kit/issues)

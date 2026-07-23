@@ -2,6 +2,16 @@
 
 文档导航：[A0 文档索引](./docs/A0_DOC_INDEX.md)
 
+## v1.1.1
+
+本版本统一GitHub `main`、本地Kit、Codex Skill安装路径和Release发布资产。
+
+- GitHub默认README改为英文，并提供完整简体中文版本。
+- Codex用户级Skill默认目录更新为`%USERPROFILE%\.agents\skills\ah-disclosure`，与当前Codex发现规则一致。
+- Codex stdio MCP示例移除不需要的`type = "stdio"`字段，并补充MCP与Skill端到端验收步骤。
+- 安装说明明确当前Python环境、可选`.venv`、Tesseract降级行为和Skill目标目录覆盖行为。
+- 中英文README、安装文档、版本文件、sdist、wheel和完整ZIP统一为`v1.1.1`。
+
 ## v1.1.0
 
 本版本重点优化 PDF 来源定位和重复查询性能。
@@ -168,7 +178,7 @@
 ---
 **文档创建时间：** 2026-07-03 19:31
 
-**最后修改时间：** 2026-07-23 14:52
+**最后修改时间：** 2026-07-23 15:27
 
 **最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
 

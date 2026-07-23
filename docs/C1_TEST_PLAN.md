@@ -12,7 +12,7 @@
 python -m pytest -q
 ```
 
-当前 v1.1.0 发布候选测试结果：
+当前 v1.1.1 发布候选测试结果：
 
 ```text
 294 passed
@@ -180,7 +180,7 @@ ah-disclosure local search --query "revenue recognition"
 ---
 **文档创建时间：** 2026-07-03 19:31
 
-**最后修改时间：** 2026-07-23 14:52
+**最后修改时间：** 2026-07-23 15:27
 
 **最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
 

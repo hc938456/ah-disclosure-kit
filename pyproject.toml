@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ah-disclosure-kit"
-version = "1.1.0"
+version = "1.1.1"
 description = "A/H-share disclosure documents, non-trading company data, PDF ingest, local search, and MCP tools."
 readme = "README.md"
 requires-python = ">=3.11"
