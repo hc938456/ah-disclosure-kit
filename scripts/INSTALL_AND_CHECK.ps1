@@ -85,7 +85,7 @@ if (-not $SkipSkillCopy) {
     Write-Step "Copying Codex skill"
     $SkillSource = Join-Path $ProjectRoot "skills\ah-disclosure"
     $SkillTargetRoot = if ([string]::IsNullOrWhiteSpace($SkillInstallRoot)) {
-        Join-Path $env:USERPROFILE ".codex\skills"
+        Join-Path $env:USERPROFILE ".agents\skills"
     } else {
         [System.IO.Path]::GetFullPath($SkillInstallRoot)
     }

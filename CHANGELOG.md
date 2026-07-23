@@ -11,7 +11,7 @@
 - 发布前安全与一致性复核补齐文档ID路径边界、缓存按需增强、分析运行上下文绑定、跨claim计算、下载来源身份、SQLite索引一致性和表格失败清理；发布包测试数量以`docs/C1_TEST_PLAN.md`中的最终复核记录为准。
 - 移除未被实现使用的Camelot、OpenCV、ChromaDB和sentence-transformers依赖；表格抽取只声明实际使用的pdfplumber，向量接口明确为外部后端清单，不再把占位文件描述为已生成embedding索引。
 
-- 最终发布候选通过288项自动化测试、Ruff、Mypy、Python编译和sdist/wheel构建验证。
+- 最终发布候选通过294项自动化测试、Ruff、Mypy、Python编译和sdist/wheel构建验证。
 - A股公告、年报、招股书和融资文件查询的默认结束日期改为系统当前日期，消除固定`20261231`导致2027年后默认漏查新公告的问题。
 - checkpoint新增输入文件SHA-256、有效运行参数和schema版本校验；同路径输入内容或OCR等关键参数变化时拒绝错误复用旧结果。
 - PDF下载重试覆盖HTTP 408/425/429/5xx和流式传输中断，支持`Retry-After`，并使用按目标文件加锁及唯一临时文件避免并发碰撞；MD5和SHA-256在下载写入时同步计算，不再额外读取整份文件。
@@ -164,4 +164,11 @@
 - 初始化 Python 包、CLI、MCP server 和 Skill。
 - 接入 AKShare、CNINFO、HKEXnews、东方财富 IPO 相关路径。
 - 建立 PDF ingest、SQLite FTS、本地检索和测试骨架。
+
+---
+**文档创建时间：** 2026-07-03 19:31
+
+**最后修改时间：** 2026-07-23 14:52
+
+**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
 

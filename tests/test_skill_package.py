@@ -106,6 +106,8 @@ def test_distribution_and_installer_preserve_complete_skill() -> None:
     installer = (ROOT / "scripts" / "INSTALL_AND_CHECK.ps1").read_text(encoding="utf-8")
     assert "SkillInstallRoot" in installer
     assert '"skills\\ah-disclosure"' in installer
+    assert '".agents\\skills"' in installer
+    assert '".codex\\skills"' not in installer
     assert "Copy-Item -Recurse" in installer
 
 

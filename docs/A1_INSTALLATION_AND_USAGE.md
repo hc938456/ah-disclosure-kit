@@ -34,7 +34,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 - 检查已有 Python 是否为 3.11+。
 - 安装/更新 Python 包依赖，默认安装 `.[pdf,company-data,mcp]`。
 - 创建默认数据目录。
-- 复制 Skill 到 `.codex\skills\ah-disclosure`。
+- 替换同名目标，并复制 Skill 到用户级 `.agents\skills\ah-disclosure`。
 - 如果当前环境存在 `claude` 命令，则注册 MCP server。
 - 验证 `ah-disclosure-kit` 版本和 CLI 基础命令。
 
@@ -43,6 +43,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 - 不安装 Python 解释器。
 - 不安装 Tesseract OCR。
 - 不创建项目 `.venv`。
+
+脚本会升级当前`python`对应环境中的`pip`，并使用editable模式安装Kit。为了与其他Python工具隔离，可以在执行脚本前创建并启用`.venv`；如果不启用虚拟环境，脚本会修改当前`python`指向的环境。
 
 常用参数：
 
@@ -68,7 +70,7 @@ python -m pip install -e ".[pdf,company-data,mcp]"
 python -m pip install -e ".[all]"
 ```
 
-当前设计建议优先使用全局 Python，避免每个工具目录都复制一份 `.venv`，减小安装目录体积。
+安装到哪个Python环境由使用者决定。用于长期运行MCP时，建议使用固定的独立`.venv`以减少与其他工具的依赖冲突；如选择全局或用户级Python，应先确认升级`pip`和安装依赖不会影响现有项目。
 
 默认一键安装及上述常规手工安装包含PDF解析、AKShare公司数据和MCP运行依赖。仅需来源查询和下载时，可使用`python -m pip install -e .`安装轻量核心；其他能力可按需选择`pdf`、`company-data`、`mcp`、`layout`、`table`、`ocr`、`vector`和`dev`。`layout`用于按版面生成增强Markdown，默认ingest不需要。Python的`ocr`依赖不会安装系统级Tesseract OCR，使用OCR仍需另行安装Tesseract。
 
@@ -99,6 +101,19 @@ $env:AH_DISCLOSURE_DATA_DIR="C:\path\to\data\ah_disclosure"
 
 ## 4. 注册 MCP
 
+Codex在`%USERPROFILE%\.codex\config.toml`中使用以下配置：
+
+```toml
+[mcp_servers.ah_disclosure]
+command = 'C:\path\to\python.exe'
+args = ["-m", "ah_disclosure.mcp_server"]
+startup_timeout_sec = 120
+```
+
+其中`command`应使用安装Kit时的Python绝对路径，可通过`python -c "import sys; print(sys.executable)"`查询。重启Codex后运行`codex mcp list`，并在支持命令菜单的界面通过`/mcp`确认`ah_disclosure`已连接。
+
+Claude Code可使用：
+
 ```powershell
 claude mcp add --transport stdio --scope user ah-disclosure "python -m ah_disclosure.mcp_server"
 ```
@@ -122,13 +137,13 @@ skills/ah-disclosure
 到用户级目录：
 
 ```text
-C:\Users\<用户名>\.codex\skills\ah-disclosure
+C:\Users\<用户名>\.agents\skills\ah-disclosure
 ```
 
 示例路径：
 
 ```text
-C:\Users\<用户名>\.codex\skills\ah-disclosure
+C:\Users\<用户名>\.agents\skills\ah-disclosure
 ```
 
 也可以复制到项目根目录的 `.agents\skills\ah-disclosure`，仅对该项目生效。不要只复制 `SKILL.md`；`agents/` 和 `references/` 也是 Skill 的组成部分。
@@ -138,6 +153,8 @@ C:\Users\<用户名>\.codex\skills\ah-disclosure
 ```powershell
 .\scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot "C:\目标项目\.agents\skills"
 ```
+
+重启Codex后，在Skills页面或支持`/skills`的界面确认`ah-disclosure`已被发现；也可以在新任务中显式使用`$ah-disclosure`进行验证。
 
 ## 6. 常用 CLI 命令
 
@@ -249,4 +266,11 @@ ah-disclosure batch prepare `
 只说“下载 PDF”时，工具不会默认抽文本、不会写 SQLite、不会生成 `pages.jsonl`。
 
 只有当用户要求分析、阅读、检索、摘要或准备证据时，才会执行 ingest。
+
+---
+**文档创建时间：** 2026-07-03 15:44
+
+**最后修改时间：** 2026-07-23 14:52
+
+**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
 

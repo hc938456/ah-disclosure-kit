@@ -41,7 +41,7 @@ skills/ah-disclosure/
 更新后必须同步整个目录，而不只是 `SKILL.md`，否则 `agents/` 和 `references/` 会漂移。用户级安装位置为：
 
 ```text
-C:\Users\<用户名>\.codex\skills\ah-disclosure\
+C:\Users\<用户名>\.agents\skills\ah-disclosure\
 ```
 
 项目级安装也可以同步到项目根目录的 `.agents\skills\ah-disclosure\`。运行 `scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot "C:\目标项目\.agents\skills"` 会先清理旧目标，再从规范源完整复制，避免遗留已删除的 reference 文件。同步后重启当前 Claude Code / Codex 会话。
@@ -69,4 +69,11 @@ claude mcp add --transport stdio --scope user ah-disclosure "python -m ah_disclo
 - `reconcile_local_index_tool`
 
 这样可以让 PDF、解析产物和 SQLite 索引保持一致。
+
+---
+**文档创建时间：** 2026-07-03 15:44
+
+**最后修改时间：** 2026-07-23 14:52
+
+**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
 

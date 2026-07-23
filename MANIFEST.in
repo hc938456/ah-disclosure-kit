@@ -1,5 +1,6 @@
 include LICENSE
 include CHANGELOG.md
+include README.zh-CN.md
 include VERSION
 include requirements.txt
 include config.example.toml
