@@ -1,6 +1,6 @@
 # A0 Claude Code 命令示例
 
-相关文档：[A0.文档索引](../docs/A0_DOC_INDEX.md) | [A1.安装使用](../docs/A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](../docs/A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](../docs/A3_WORKFLOW.md) | [A4.MCP函数](../docs/A4_MCP_TOOLS.md) | [B1.PDF Ingest](../docs/B1_PDF_INGEST.md) | [B2.公司数据](../docs/B2_COMPANY_DATA.md) | [B3.HKEX](../docs/B3_HKEX.md) | [B4.招股书](../docs/B4_PROSPECTUS.md) | [C1.测试计划](../docs/C1_TEST_PLAN.md) | [D1.开发计划](../docs/D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../CHANGELOG.md)
+文档导航：[A0 文档索引](../docs/A0_DOC_INDEX.md)
 
 ## 1. 注册 MCP
 
@@ -62,5 +62,11 @@ claude mcp add --transport stdio --scope user ah-disclosure "python -m ah_disclo
 
 ```text
 使用 ah-disclosure 返回 EvidencePacket，并基于证据页回答。请列出来源文件、页码和本地 PDF 路径。
+```
+
+批量准备但暂不分析：
+
+```text
+使用 ah-disclosure batch prepare，按我提供的公司名单批量完成代码确认、来源定位、下载、校验和ingest；不要提取EvidencePacket，不要分析、估值或写作。完成后汇总每条任务状态和各阶段耗时。
 ```
 

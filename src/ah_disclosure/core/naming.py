@@ -1,7 +1,39 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
+
+
+def validate_document_id(value: Any) -> str:
+    """Validate an ID before using it as a single filesystem path component."""
+    document_id = str(value or "")
+    if not document_id:
+        raise ValueError("document_id must not be empty")
+    if document_id != document_id.strip() or document_id.endswith("."):
+        raise ValueError("document_id must not have unsafe leading or trailing characters")
+    if document_id in {".", ".."}:
+        raise ValueError("document_id must not be a relative path segment")
+    if "/" in document_id or "\\" in document_id:
+        raise ValueError("document_id must not contain path separators")
+    if Path(document_id).is_absolute() or re.match(r"^[A-Za-z]:", document_id):
+        raise ValueError("document_id must not be an absolute path")
+    if re.search(r'[<>:"|?*\x00-\x1f]', document_id):
+        raise ValueError("document_id contains characters unsafe for filesystem paths")
+    return document_id
+
+
+def safe_document_path(parent: Path, document_id: Any) -> Path:
+    """Build a child path from a validated document ID.
+
+    This helper is intentionally reusable by ingest and cleanup code.
+    """
+    validated = validate_document_id(document_id)
+    resolved_parent = parent.resolve()
+    candidate = (resolved_parent / validated).resolve()
+    if candidate == resolved_parent or candidate.parent != resolved_parent:
+        raise ValueError("document_id does not resolve to a direct child path")
+    return candidate
 
 
 def safe_name(value: Any, fallback: str = "document", max_length: int = 120) -> str:
@@ -57,7 +89,7 @@ def normalize_document_type(document_type: Any = None, title: Any = None) -> str
         return "interim_report"
     if "quarter" in text or "季度" in text or "季报" in text:
         return "quarterly_report"
-    if "prospectus" in text or "招股" in text:
+    if "prospectus" in text or "招股" in text or "global offering" in text:
         return "prospectus"
     if "offering" in text or "募集说明书" in text:
         return "offering_document"

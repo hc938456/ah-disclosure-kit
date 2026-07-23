@@ -1,6 +1,8 @@
 # D1 开发计划 v1.0
 
-相关文档：[README](../README.md) | [A0.文档索引](./A0_DOC_INDEX.md) | [A1.安装使用](./A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](./A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](./A3_WORKFLOW.md) | [A4.MCP函数](./A4_MCP_TOOLS.md) | [B1.PDF Ingest](./B1_PDF_INGEST.md) | [B2.公司数据](./B2_COMPANY_DATA.md) | [B3.HKEX](./B3_HKEX.md) | [B4.招股书](./B4_PROSPECTUS.md) | [C1.测试计划](./C1_TEST_PLAN.md) | [D1.开发计划](./D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../CHANGELOG.md)
+> 归档说明：本文保留v1.0定稿时的设计、测试数量和后续设想，仅用于追溯历史。v1.1.0及后续实际行为以README、A/B/C类文档和CHANGELOG为准。
+
+文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
 
 文件版本：v1.0  
 开发定稿时间：2026-07-03 15:44  
@@ -161,7 +163,7 @@ logs/      日志
 
 ## 10. 后续建议
 
-v1.1 可以考虑：
+以下是v1.0定稿时提出的历史建议，其中部分已在v1.1.0完成：
 
 - 港股结构化数据缓存和重试进一步增强。
 - 表格抽取质量评估。

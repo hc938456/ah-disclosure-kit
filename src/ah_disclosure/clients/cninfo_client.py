@@ -1,18 +1,26 @@
 from __future__ import annotations
 
 import math
+import json
 import re
+import time
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urljoin
 
 import requests
 
+from ah_disclosure.core.config import get_settings
+from ah_disclosure.core.file_utils import replace_file_with_retry
+from ah_disclosure.core.paths import get_data_paths
+from ah_disclosure.core.time_utils import current_date_yyyymmdd
 from ah_disclosure.models import FilingRecord
 
-CNINFO_BASE = "http://www.cninfo.com.cn"
-CNINFO_STATIC_BASE = "http://static.cninfo.com.cn/"
+CNINFO_BASE = "https://www.cninfo.com.cn"
+CNINFO_STATIC_BASE = "https://static.cninfo.com.cn/"
 CNINFO_QUERY_URL = f"{CNINFO_BASE}/new/hisAnnouncement/query"
+CNINFO_TOP_SEARCH_URL = f"{CNINFO_BASE}/new/information/topSearch/query"
 CNINFO_STOCK_URLS = {
     "沪深京": f"{CNINFO_BASE}/new/data/szse_stock.json",
     "港股": f"{CNINFO_BASE}/new/data/hke_stock.json",
@@ -37,6 +45,29 @@ HEADERS = {
     "Referer": f"{CNINFO_BASE}/new/commonUrl/pageOfSearch?url=disclosure/list/search",
     "Accept": "application/json, text/plain, */*",
 }
+
+
+def _org_map_cache_path() -> Path:
+    return get_data_paths().cache_resolver / "cninfo_org_map.json"
+
+
+def _read_org_map_cache() -> dict[str, str]:
+    path = _org_map_cache_path()
+    max_age = get_settings().resolver_ttl_days * 86400
+    if not path.exists() or time.time() - path.stat().st_mtime > max_age:
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return {str(key): str(value) for key, value in payload.items() if key and value}
+    except Exception:
+        return {}
+
+
+def _write_org_map_cache(mapping: dict[str, str]) -> None:
+    path = _org_map_cache_path()
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(mapping, ensure_ascii=False, indent=2), encoding="utf-8")
+    replace_file_with_retry(tmp, path)
 
 
 def _date(value: str) -> str:
@@ -70,6 +101,8 @@ def _time(value: Any) -> str:
 def _pdf_url(adjunct_url: str | None) -> str | None:
     if not adjunct_url:
         return None
+    if adjunct_url.startswith("http://static.cninfo.com.cn/"):
+        return "https://" + adjunct_url.removeprefix("http://")
     if adjunct_url.startswith(("http://", "https://")):
         return adjunct_url
     return urljoin(CNINFO_STATIC_BASE, adjunct_url.lstrip("/"))
@@ -90,9 +123,38 @@ class CninfoClient:
 
     @lru_cache(maxsize=32)
     def get_stock_org_map(self, market: str = "沪深京") -> dict[str, str]:
+        if market == "沪深京":
+            cached = _read_org_map_cache()
+            if cached:
+                return cached
         resp = self.session.get(CNINFO_STOCK_URLS[market], timeout=self.timeout)
         resp.raise_for_status()
-        return {str(item.get("code")): str(item.get("orgId")) for item in resp.json().get("stockList", []) if item.get("code")}
+        mapping = {
+            str(item.get("code")): str(item.get("orgId"))
+            for item in resp.json().get("stockList", [])
+            if item.get("code") and item.get("orgId")
+        }
+        if market == "沪深京":
+            _write_org_map_cache(mapping)
+        return mapping
+
+    def lookup_stock_org_id(self, symbol: str) -> str | None:
+        code = str(symbol).strip()
+        resp = self.session.post(
+            CNINFO_TOP_SEARCH_URL,
+            data={"keyWord": code, "maxNum": "10"},
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        rows = resp.json()
+        for item in rows if isinstance(rows, list) else []:
+            if str(item.get("code") or "").strip() == code and item.get("orgId"):
+                org_id = str(item["orgId"])
+                mapping = self.get_stock_org_map()
+                mapping[code] = org_id
+                _write_org_map_cache(mapping)
+                return org_id
+        return None
 
     def search_filings(
         self,
@@ -100,7 +162,7 @@ class CninfoClient:
         category: str = "年报",
         keyword: str = "",
         start_date: str = "20200101",
-        end_date: str = "20261231",
+        end_date: str | None = None,
         market: str = "沪深京",
         max_rows: int = 20,
         page_size: int = 30,
@@ -109,9 +171,12 @@ class CninfoClient:
         stock_item = ""
         if symbol:
             org_id = self.get_stock_org_map(market).get(str(symbol).strip())
+            if not org_id and market == "沪深京":
+                org_id = self.lookup_stock_org_id(str(symbol).strip())
             if not org_id:
                 raise ValueError(f"Cannot resolve CNINFO orgId for symbol={symbol!r}")
             stock_item = f"{symbol},{org_id}"
+        end_date = end_date or current_date_yyyymmdd()
         payload = {
             "pageNum": "1",
             "pageSize": str(page_size),

@@ -53,6 +53,23 @@ IPO_LIST_HINTS = ["新增", "至今", "名单", "清单", "列表", "list", "全
 
 LOCAL_EVIDENCE_HINTS = ["原因", "为什么", "风险", "业务模式", "管理层讨论", "募投项目", "变化解释"]
 
+BUSINESS_MODEL_HINTS = [
+    "收入模式",
+    "收入来源",
+    "业务分部",
+    "业务板块",
+    "产品结构",
+    "分行业",
+    "分产品",
+    "主营业务",
+    "revenue model",
+    "revenue stream",
+    "revenue breakdown",
+    "operating segment",
+    "reportable segment",
+    "business segment",
+]
+
 LLM_REQUIRED_ROUTES = {"local_document_evidence", "hybrid_structured_and_filing_evidence", "unsupported_hk_ipo_annual_list"}
 
 
@@ -74,6 +91,8 @@ def route_query(query: str) -> dict:
         route = "unsupported_hk_ipo_annual_list"
     elif _contains_any(q, DOWNLOAD_HINTS) and _contains_any(q, FILING_HINTS):
         route = "filing_search_download_ingest"
+    elif _contains_any(q, BUSINESS_MODEL_HINTS):
+        route = "local_document_evidence"
     elif _contains_any(q, ACCOUNTING_EVIDENCE_HINTS):
         route = "local_document_evidence"
     elif _contains_any(q, PROFILE_HINTS):

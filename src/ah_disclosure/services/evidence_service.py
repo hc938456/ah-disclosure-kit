@@ -28,7 +28,7 @@ def _structured_payload_for_query(query: str, route: str, market: str, symbol: s
     return None
 
 
-def get_evidence_packet(query: str, market: str | None = None, symbol: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, include_structured_data: bool = True, strategy: str = "auto", include_retrieval_plan: bool = False) -> dict:
+def get_evidence_packet(query: str, market: str | None = None, symbol: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, include_structured_data: bool = True, strategy: str = "auto", include_retrieval_plan: bool = False, reconcile: bool = True) -> dict:
     route = route_query(query)
     if route["route"] in UNSUPPORTED_ROUTE_MESSAGES:
         return {
@@ -49,6 +49,6 @@ def get_evidence_packet(query: str, market: str | None = None, symbol: str | Non
             structured = _structured_payload_for_query(query, route["route"], market, symbol)
         except Exception as exc:
             structured = {"error": str(exc)}
-    packet = LocalSearchService().evidence_packet(query, market=market, symbol=symbol, document_id=document_id, max_pages=max_pages, max_chars=max_chars, structured_data=structured, strategy=strategy, include_retrieval_plan=include_retrieval_plan)
+    packet = LocalSearchService().evidence_packet(query, market=market, symbol=symbol, document_id=document_id, max_pages=max_pages, max_chars=max_chars, structured_data=structured, strategy=strategy, include_retrieval_plan=include_retrieval_plan, reconcile=reconcile)
     packet["route"] = route["route"]
     return packet

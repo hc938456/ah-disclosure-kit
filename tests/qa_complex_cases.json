@@ -1,0 +1,330 @@
+[
+  {
+    "case_id": "annual_lease_liability_cashflow_bridge",
+    "category": "lease_cashflow_reconciliation",
+    "document_ids": ["H_02319_2025_annual_report_EN_MENGNIU_DAIRY"],
+    "question": "重构蒙牛2025年租赁负债滚动，并区分租赁本金、利息、新增租赁和非现金变动。",
+    "claims": [
+      {
+        "claim_id": "lease_balance_split",
+        "question": "流动和非流动租赁负债余额",
+        "queries": ["lease liabilities current non-current 2025 2024", "current portion non-current lease liabilities"],
+        "expected_groups": [["lease liabilities"], ["current"], ["non-current", "non current"]]
+      },
+      {
+        "claim_id": "lease_rollforward",
+        "question": "租赁负债期初、新增、利息、支付和期末滚动",
+        "queries": ["changes liabilities arising financing activities lease liabilities cash non-cash changes", "lease liabilities at 1 January payments interest new leases"],
+        "expected_groups": [["lease liabilities"], ["non-cash changes", "new leases", "additions"], ["interest"], ["payments", "repayment"]]
+      },
+      {
+        "claim_id": "lease_cashflow",
+        "question": "租赁本金和利息现金支付及现金流分类",
+        "queries": ["repayment lease liabilities interest paid financing activities", "total cash outflow leases"],
+        "expected_groups": [["lease liabilities", "lease payments"], ["interest"], ["financing activities", "cash outflow"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_inventory_financing_debt_bridge",
+    "category": "financing_balance_sheet_reconciliation",
+    "document_ids": ["H_00881_2025_annual_report_EN_ZHONGSHENG_HLDG"],
+    "question": "结合存货抵押、借款余额和融资现金流分析中升控股汽车库存融资。",
+    "claims": [
+      {
+        "claim_id": "borrowing_maturity",
+        "question": "借款余额、流动性分类和期限结构",
+        "queries": ["bank borrowings current non-current 2025 2024 maturity", "borrowings repayable within one year secured unsecured"],
+        "expected_groups": [["bank borrowings", "bank loans"], ["within one year", "current"], ["secured", "unsecured"]]
+      },
+      {
+        "claim_id": "inventory_collateral",
+        "question": "抵押汽车存货、银行存款及其他担保资产",
+        "queries": ["inventories pledged secure bank borrowings motor vehicles", "pledged bank deposits banking facilities"],
+        "expected_groups": [["inventories", "motor vehicles"], ["pledged", "secured", "security"], ["bank borrowings", "banking facilities"]]
+      },
+      {
+        "claim_id": "debt_cashflow",
+        "question": "新增借款、偿还借款和已付利息",
+        "queries": ["new bank borrowings repayment bank borrowings financing activities", "interest paid financing cash flows"],
+        "expected_groups": [["borrowings"], ["repayment", "repayments"], ["interest paid"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_ah_cash_fx_full_bridge",
+    "category": "cross_document_cash_reconciliation",
+    "document_ids": ["A_601919_2025_annual_report_ZH_中远海控", "H_01919_2025_annual_report_EN_COSCO_SHIP_HOLD"],
+    "question": "分别用中远海控A/H年报把期初现金经三类现金流和汇率影响勾稽至期末。",
+    "require_all_documents": true,
+    "claims": [
+      {
+        "claim_id": "a_cash_bridge",
+        "question": "A股年报完整现金桥",
+        "document_ids": ["A_601919_2025_annual_report_ZH_中远海控"],
+        "require_documents": ["A_601919_2025_annual_report_ZH_中远海控"],
+        "queries": ["期初现金及现金等价物余额 期末现金及现金等价物余额", "现金及现金等价物净增加额 汇率变动 经营活动 投资活动 筹资活动"],
+        "expected_groups": [["期初现金及现金等价物余额"], ["汇率变动"], ["期末现金及现金等价物余额"]]
+      },
+      {
+        "claim_id": "h_cash_bridge",
+        "question": "H股年报完整现金桥",
+        "document_ids": ["H_01919_2025_annual_report_EN_COSCO_SHIP_HOLD"],
+        "require_documents": ["H_01919_2025_annual_report_EN_COSCO_SHIP_HOLD"],
+        "queries": ["cash and cash equivalents at beginning of year at end of year net increase", "net cash generated from operating activities investing activities financing activities effect exchange rate"],
+        "expected_groups": [["cash and cash equivalents"], ["exchange rate", "foreign exchange"], ["operating activities"], ["financing activities"]]
+      },
+      {
+        "claim_id": "ah_cash_basis",
+        "question": "两份报告的币种、单位和现金等价物定义",
+        "require_documents": ["A_601919_2025_annual_report_ZH_中远海控", "H_01919_2025_annual_report_EN_COSCO_SHIP_HOLD"],
+        "queries": ["人民币千元 现金及现金等价物", "RMB'000 cash and cash equivalents"],
+        "expected_groups": [["人民币", "RMB"], ["现金及现金等价物", "cash and cash equivalents"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_tax_expense_deferred_cash_bridge",
+    "category": "tax_cross_statement_reconciliation",
+    "document_ids": ["A_002179_2025_annual_report_ZH_中航光电"],
+    "question": "重构中航光电所得税费用，并分析递延税项与支付税费为何不能直接等同。",
+    "claims": [
+      {
+        "claim_id": "tax_components",
+        "question": "当期所得税、递延所得税及所得税费用",
+        "queries": ["所得税费用 当期所得税 递延所得税", "当期所得税费用 递延所得税费用"],
+        "expected_groups": [["所得税费用"], ["当期所得税"], ["递延所得税"]]
+      },
+      {
+        "claim_id": "tax_rate_bridge",
+        "question": "利润总额按法定税率计算并调节到所得税费用",
+        "queries": ["会计利润与所得税费用调整过程", "利润总额 法定税率 不可抵扣 研发加计扣除"],
+        "expected_groups": [["利润总额"], ["税率"], ["所得税费用"]]
+      },
+      {
+        "claim_id": "deferred_tax_movement",
+        "question": "递延所得税资产负债及暂时性差异变动",
+        "queries": ["递延所得税资产 递延所得税负债 期初 期末", "暂时性差异 可抵扣亏损"],
+        "expected_groups": [["递延所得税资产"], ["递延所得税负债"], ["暂时性差异", "可抵扣亏损"]]
+      },
+      {
+        "claim_id": "cash_taxes_paid",
+        "question": "现金流量表支付的各项税费",
+        "queries": ["支付的各项税费 现金流量表", "所得税费用 支付税费 经营活动"],
+        "expected_groups": [["支付的各项税费"], ["经营活动"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_ecovacs_goodwill_impairment",
+    "category": "complex_accounting_estimate",
+    "document_ids": ["A_603486_2025_annual_report_ZH_科沃斯"],
+    "question": "分析科沃斯商誉资产组、可收回金额方法、关键假设和敏感性披露。",
+    "claims": [
+      {
+        "claim_id": "goodwill_cgu",
+        "question": "商誉余额及资产组分配",
+        "queries": ["商誉 期初余额 期末余额 资产组", "商誉 所在资产组 资产组组合"],
+        "expected_groups": [["商誉"], ["资产组", "资产组组合"], ["期末余额", "账面价值"]]
+      },
+      {
+        "claim_id": "goodwill_method",
+        "question": "可收回金额方法和关键假设",
+        "queries": ["商誉减值测试 可收回金额 预计未来现金流量现值", "增长率 毛利率 折现率 商誉"],
+        "expected_groups": [["可收回金额"], ["未来现金流量", "使用价值"], ["折现率"]]
+      },
+      {
+        "claim_id": "goodwill_sensitivity",
+        "question": "减值结果和关键假设敏感性",
+        "queries": ["商誉 减值损失 敏感性分析", "关键假设 合理变动 可收回金额"],
+        "expected_groups": [["减值"], ["敏感性", "合理变动", "可收回金额"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_verisilicon_rd_investment_bridge",
+    "category": "rd_profit_quality",
+    "document_ids": ["A_688521_2025_annual_report_ZH_芯原股份"],
+    "question": "把研发投入桥接到费用化、资本化和开发支出，并识别股份支付影响。",
+    "claims": [
+      {
+        "claim_id": "rd_investment_bridge",
+        "question": "研发投入总额、费用化和资本化投入",
+        "queries": ["研发投入总额 费用化研发投入 资本化研发投入", "研发投入资本化的比重"],
+        "expected_groups": [["研发投入总额"], ["费用化研发投入", "研发费用"], ["资本化研发投入"]]
+      },
+      {
+        "claim_id": "development_cost_bridge",
+        "question": "开发支出期初、本期增加、转入无形资产和期末",
+        "queries": ["开发支出 期初余额 本期增加 转入无形资产 期末余额", "内部开发支出 本期减少"],
+        "expected_groups": [["开发支出"], ["本期增加"], ["无形资产"], ["期末余额"]]
+      },
+      {
+        "claim_id": "rd_share_payment",
+        "question": "研发费用包含的股份支付等非现金薪酬",
+        "queries": ["研发费用 股份支付 研发人员", "股份支付费用 研发费用"],
+        "expected_groups": [["股份支付"], ["研发费用", "研发人员"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_avicoptronics_ecl_bridge",
+    "category": "financial_instrument_estimate",
+    "document_ids": ["A_002179_2025_annual_report_ZH_中航光电"],
+    "question": "勾稽中航光电应收款余额、坏账准备、账龄和预期信用损失率。",
+    "claims": [
+      {
+        "claim_id": "ecl_balance_bridge",
+        "question": "应收款账面余额、坏账准备和账面价值",
+        "queries": ["应收账款 账面余额 坏账准备 账面价值", "应收票据 坏账准备 期末余额"],
+        "expected_groups": [["账面余额"], ["坏账准备"], ["账面价值"]]
+      },
+      {
+        "claim_id": "ecl_method",
+        "question": "单项与组合计提及预期信用损失率",
+        "queries": ["单项计提 组合计提 应收账款", "信用风险特征组合 预期信用损失率"],
+        "expected_groups": [["单项计提"], ["组合计提"], ["预期信用损失率", "坏账准备"]]
+      },
+      {
+        "claim_id": "ecl_aging",
+        "question": "账龄结构及损失率",
+        "queries": ["应收账款账龄 预期信用损失率", "一年以内 一至二年 应收账款"],
+        "expected_groups": [["账龄"], ["1年以内", "1 年以内", "一年以内"], ["预期信用损失率", "计提比例"]]
+      },
+      {
+        "claim_id": "ecl_movement",
+        "question": "坏账准备期初、计提、转回、核销和期末",
+        "queries": ["坏账准备变动情况 本期计提 收回 转回 核销", "坏账准备期初余额期末余额"],
+        "expected_groups": [["期初余额"], ["本期计提"], ["转回", "核销", "收回"], ["期末余额"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_dizal_share_payment_cash_burn",
+    "category": "prospectus_complex_analysis",
+    "document_ids": ["A_688192_2021_prospectus_ZH_迪哲医药"],
+    "question": "区分迪哲医药限制性股票、期权费用与真实现金消耗。",
+    "claims": [
+      {
+        "claim_id": "dizal_restricted_payment",
+        "question": "限制性股票股份支付总额及费用归属",
+        "queries": ["股份支付费用 39,817.77 管理费用 研发费用", "授予股份公允价值 差额"],
+        "expected_groups": [["39,817.77", "39817.77"], ["27,894.33", "27894.33"], ["11,923.44", "11923.44"]]
+      },
+      {
+        "claim_id": "dizal_option_schedule",
+        "question": "期权估值和未来费用分摊",
+        "queries": ["蒙特卡罗模拟方法 期权 公允价值 股份支付费用", "预计股份支付费用 2021 2022 2023"],
+        "expected_groups": [["蒙特卡罗模拟方法"], ["5,650.22", "5650.22"], ["2,117.42", "2117.42"]]
+      },
+      {
+        "claim_id": "dizal_cash_distinction",
+        "question": "股份支付利润影响与外部融资现金需求",
+        "queries": ["营运资金依赖于外部融资 研发项目", "股份支付金额持续较大 经营业绩"],
+        "expected_groups": [["营运资金依赖于外部融资"], ["股份支付金额持续较大"], ["研发项目", "研发支出"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_ninebot_preferred_financing_cash_vs_loss",
+    "category": "prospectus_complex_analysis",
+    "document_ids": ["A_689009_2020_prospectus_ZH_九号公司"],
+    "question": "解释九号公司优先股条款、公允价值亏损和经营现金流背离。",
+    "claims": [
+      {
+        "claim_id": "ninebot_redemption",
+        "question": "赎回价格和清算优先权",
+        "queries": ["赎回条款 年复利15% 公允价值 孰高", "优先股 清算优先权 发行价格 120%"],
+        "expected_groups": [["年复利15%", "年利率15%"], ["公允价值"], ["清算优先权"]]
+      },
+      {
+        "claim_id": "ninebot_rights_restore",
+        "question": "优先权终止和上市失败恢复机制",
+        "queries": ["对赌安排 终止协议 恢复日", "优先权利 自动终止 上市截止日 恢复"],
+        "expected_groups": [["对赌安排"], ["终止协议"], ["恢复日", "自动恢复"]]
+      },
+      {
+        "claim_id": "ninebot_fv_loss",
+        "question": "优先股和可转换债券公允价值损失",
+        "queries": ["公允价值变动损益 可转换债券 优先股 净利润", "优先股和可转换债券事项 对公司净利润的影响"],
+        "expected_groups": [["58,873.05", "58873.05"], ["235,279.23", "235279.23"], ["59,876.18", "59876.18"]]
+      },
+      {
+        "claim_id": "ninebot_operating_cash",
+        "question": "经营现金流与账面亏损背离",
+        "queries": ["经营活动产生的现金流量净额 销售收入质量", "销售商品提供劳务收到的现金 营业收入 净利润"],
+        "expected_groups": [["13,747.64", "13747.64"], ["37,660.68", "37660.68"], ["25,127.52", "25127.52"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_chenqi_preipo_rights_conversion",
+    "category": "prospectus_complex_analysis",
+    "document_ids": ["H_09680_2024_prospectus_EN_CHENQI_TECH"],
+    "question": "分析如祺出行Pre-IPO融资、赎回负债和上市转换，并识别估值缺口。",
+    "claims": [
+      {
+        "claim_id": "chenqi_rounds",
+        "question": "Founding、Series A和Series B融资",
+        "queries": ["Pre-IPO Investments Founding round Series A Series B", "consideration cost per Share discount financing"],
+        "expected_groups": [["Pre-IPO Investments"], ["Founding round"], ["Series A"], ["Series B"]]
+      },
+      {
+        "claim_id": "chenqi_redemption",
+        "question": "优先股赎回权和触发事项",
+        "queries": ["Redemption rights holders Series A Preferred Shares triggering events qualified IPO", "redemption price simple interest 8% per annum"],
+        "expected_groups": [["redemption rights", "redemption price"], ["Series A Preferred Shares"], ["triggering events"]]
+      },
+      {
+        "claim_id": "chenqi_liability",
+        "question": "金融负债分类和赎回金额现值计量",
+        "queries": ["convertible redeemable preferred shares classified financial liabilities present value redemption amount", "subsequent changes carrying amount redemption amount finance costs"],
+        "expected_groups": [["financial liabilities"], ["present value", "carrying amount"], ["redemption amount", "redeemable"]]
+      },
+      {
+        "claim_id": "chenqi_conversion",
+        "question": "Global Offering时转换普通股",
+        "queries": ["Preferred Shares converted one-to-one Global Offering", "converted into Ordinary Shares"],
+        "expected_groups": [["one-to-one basis"], ["Ordinary Shares"], ["Global Offering"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_qunabox_network_funding_runway",
+    "category": "prospectus_complex_analysis",
+    "document_ids": ["H_00917_2024_prospectus_EN_QUNABOX"],
+    "question": "用现金流、机器网络、资本开支和募资用途压力测试趣致集团自我造血能力。",
+    "claims": [
+      {
+        "claim_id": "qunabox_cash_turnaround",
+        "question": "2021至2023经营现金流转正轨迹",
+        "queries": ["net cash flows used in operating activities 2021 2022 generated 2023", "Net Cash Used in Generated From Operating Activities"],
+        "expected_groups": [["68,887", "68887"], ["108,930", "108930"], ["191.7 million", "191.7"]]
+      },
+      {
+        "claim_id": "qunabox_machine_economics",
+        "question": "机器数量、退役和固定成本结构",
+        "queries": ["number vending machines decommissioned 2021 2022 2023", "vending machines depreciation amortization site fees cost structure"],
+        "expected_groups": [["8,520"], ["7,402"], ["7,543"], ["decommissioned vending machines"], ["depreciation", "site fees"]]
+      },
+      {
+        "claim_id": "qunabox_capex_proceeds",
+        "question": "资本开支和IPO资金规模用于机器网络扩张",
+        "queries": ["capital expenditures expand vending machine network", "HK$465.0 million use of proceeds vending machine network"],
+        "expected_groups": [["capital expenditures"], ["vending machine network"], ["HK$465.0 million"]]
+      },
+      {
+        "claim_id": "qunabox_placement_costs",
+        "question": "IPO资金中的新点位铺设成本及单机计划",
+        "queries": ["HK$37.2 million placement costs new locations additional vending machines", "placement costs site fees site expansion fees 1000 new vending machines"],
+        "expected_groups": [["placement costs"], ["site fees"], ["additional vending machines", "new vending machines"]]
+      },
+      {
+        "claim_id": "qunabox_going_concern",
+        "question": "十二个月持续经营判断及优先股赎回期限",
+        "queries": ["cash flow projection sufficient working capital 12 months", "convertible redeemable preferred shares not redeemable next 12 months"],
+        "expected_groups": [["cash flow projection"], ["sufficient working capital"], ["12 months"], ["convertible redeemable preferred shares"]]
+      }
+    ]
+  }
+]

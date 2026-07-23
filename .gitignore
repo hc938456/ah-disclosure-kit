@@ -13,6 +13,7 @@ data/
 outputs/
 cache/
 logs/
+*.log
 *.sqlite
 *.sqlite3
 *.db
@@ -21,3 +22,4 @@ logs/
 *.jsonl
 *.parquet
 .DS_Store
+.test-results/

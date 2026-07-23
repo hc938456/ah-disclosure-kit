@@ -1,5 +1,6 @@
 param(
-    [string]$Extras = "pdf",
+    [string]$Extras = "pdf,company-data,mcp",
+    [string]$SkillInstallRoot = "",
     [switch]$SkipMcpRegistration,
     [switch]$SkipSkillCopy,
     [switch]$CheckTesseract
@@ -83,13 +84,26 @@ Write-Ok "Default data directory is ready: $DataDir"
 if (-not $SkipSkillCopy) {
     Write-Step "Copying Codex skill"
     $SkillSource = Join-Path $ProjectRoot "skills\ah-disclosure"
-    $SkillTargetRoot = Join-Path $env:USERPROFILE ".codex\skills"
+    $SkillTargetRoot = if ([string]::IsNullOrWhiteSpace($SkillInstallRoot)) {
+        Join-Path $env:USERPROFILE ".codex\skills"
+    } else {
+        [System.IO.Path]::GetFullPath($SkillInstallRoot)
+    }
     $SkillTarget = Join-Path $SkillTargetRoot "ah-disclosure"
     if (-not (Test-Path -LiteralPath $SkillSource)) {
         Write-Fail "Skill source directory not found: $SkillSource"
         exit 1
     }
     New-Item -ItemType Directory -Force -Path $SkillTargetRoot | Out-Null
+    $ResolvedSkillRoot = [System.IO.Path]::GetFullPath($SkillTargetRoot)
+    $ResolvedSkillTarget = [System.IO.Path]::GetFullPath($SkillTarget)
+    if (-not $ResolvedSkillTarget.StartsWith($ResolvedSkillRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Write-Fail "Refusing to replace an unexpected Skill target: $ResolvedSkillTarget"
+        exit 1
+    }
+    if (Test-Path -LiteralPath $ResolvedSkillTarget) {
+        Remove-Item -Recurse -Force -LiteralPath $ResolvedSkillTarget
+    }
     Copy-Item -Recurse -Force -LiteralPath $SkillSource -Destination $SkillTargetRoot
     Write-Ok "Skill copied to: $SkillTarget"
 }
@@ -109,8 +123,9 @@ if (-not $SkipMcpRegistration) {
 Write-Step "Verifying installation"
 $version = & python -m ah_disclosure.cli --version
 Write-Host "ah-disclosure-kit version: $version"
-if ($version.Trim() -ne "1.0.0") {
-    Write-Warn "Expected version 1.0.0, got $version"
+$expectedVersion = (Get-Content -LiteralPath (Join-Path $ProjectRoot "VERSION") -Raw).Trim()
+if ($version.Trim() -ne $expectedVersion) {
+    Write-Warn "Expected version $expectedVersion, got $version"
 } else {
     Write-Ok "Version check passed"
 }

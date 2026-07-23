@@ -57,6 +57,8 @@ class FilingRecord:
     detail_url: str | None = None
     pdf_url: str | None = None
     raw_id: str | None = None
+    category: str | None = None
+    file_size_label: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return serializable_dict(self)
@@ -111,6 +113,8 @@ class PdfPage:
     ocr_used: bool = False
     quality_score: float | None = None
     section_title: str | None = None
+    extraction_method: str | None = None
+    extraction_error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return serializable_dict(self)

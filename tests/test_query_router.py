@@ -15,6 +15,13 @@ def test_plain_revenue_profit_question_still_uses_structured_financials():
     assert route["llm_required"] is False
 
 
+def test_revenue_model_question_uses_annual_report_evidence():
+    route = route_query("这家公司有几种收入模式，主要收入来源和业务分部是什么")
+
+    assert route["route"] == "local_document_evidence"
+    assert route["llm_required"] is True
+
+
 def test_prospectus_question_wins_over_accounting_keyword():
     route = route_query("美团招股书里的会计师是谁")
 

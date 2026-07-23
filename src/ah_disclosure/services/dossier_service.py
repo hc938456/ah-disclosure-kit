@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from ah_disclosure.services.company_data_service import get_company_profile, get_dividends, get_financial_indicators, get_financial_statements
 from ah_disclosure.services.evidence_service import get_evidence_packet
 from ah_disclosure.services.financial_query import requested_financial_statement
@@ -16,7 +18,7 @@ def _fetch_into(target: dict, key: str, func, market: str, symbol: str, **params
 
 
 def build_company_dossier(market: str, symbol: str, query: str = "", document_id: str | None = None) -> dict:
-    dossier = {"market": market, "symbol": symbol, "evidence": None}
+    dossier: dict[str, Any] = {"market": market, "symbol": symbol, "evidence": None}
     route = route_query(query)["route"] if query else "default"
     if route in UNSUPPORTED_ROUTES:
         dossier["unsupported"] = True

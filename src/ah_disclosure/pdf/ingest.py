@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import json
-import re
+import uuid
 from pathlib import Path
 from typing import Any
 
-from ah_disclosure.core.naming import build_document_id
+from ah_disclosure.core.file_utils import replace_file_with_retry
+from ah_disclosure.core.naming import build_document_id, validate_document_id
 from ah_disclosure.core.paths import get_data_paths
 from ah_disclosure.core.time_utils import now_iso
 from ah_disclosure.models import PdfIngestResult, PdfPage
-from ah_disclosure.pdf.downloader import file_md5, file_sha256
+from ah_disclosure.pdf.downloader import file_hashes
 from ah_disclosure.pdf.markdown import pdf_to_markdown
 from ah_disclosure.pdf.quality import assess_pages
 from ah_disclosure.pdf.table_extract import extract_tables
@@ -17,11 +18,6 @@ from ah_disclosure.pdf.text_extract import extract_pages
 from ah_disclosure.pdf.vector_index import build_vector_index
 from ah_disclosure.storage.jsonl_store import write_jsonl
 from ah_disclosure.storage.sqlite_store import SQLiteStore
-
-
-def safe_document_id(text: str) -> str:
-    value = re.sub(r"[^0-9A-Za-z_\-\u4e00-\u9fff]+", "_", str(text)).strip("_")
-    return (value or "document")[:140]
 
 
 def _pages_to_full_text(pages: list[PdfPage]) -> str:
@@ -49,9 +45,17 @@ def _read_pages_jsonl(path: Path) -> list[PdfPage]:
                     ocr_used=bool(row.get("ocr_used")),
                     quality_score=row.get("quality_score"),
                     section_title=row.get("section_title"),
+                    extraction_method=row.get("extraction_method"),
+                    extraction_error=row.get("extraction_error"),
                 )
             )
     return pages
+
+
+def _write_json_atomic(path: Path, payload: Any) -> None:
+    tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    replace_file_with_retry(tmp, path)
 
 
 def _write_optional_text_outputs(
@@ -87,6 +91,46 @@ def _merge_meta(old: dict[str, Any], meta: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+_TABLE_KEYWORDS = (
+    "募集资金",
+    "前五大客户",
+    "主营构成",
+    "主营",
+    "分部收入",
+    "分部",
+    "资产负债表",
+    "利润表",
+    "现金流量表",
+)
+
+
+def _should_extract_tables(mode: str, option: bool | str, pages: list[PdfPage]) -> bool:
+    if mode == "full" or option is True:
+        return True
+    return option == "auto" and any(
+        keyword in page.text for page in pages for keyword in _TABLE_KEYWORDS
+    )
+
+
+def _table_candidate_pages(pages: list[PdfPage]) -> list[int] | None:
+    candidates = [
+        page.page_no
+        for page in pages
+        if any(keyword in page.text for keyword in _TABLE_KEYWORDS)
+    ]
+    return candidates or None
+
+
+def _table_extraction_state(results: list[dict[str, Any]], requested: bool) -> dict[str, Any]:
+    failed = any(bool(item.get("error")) for item in results)
+    return {
+        "requested": requested,
+        "status": "failed" if failed else ("completed" if requested else "not_requested"),
+        "result_count": sum(1 for item in results if not item.get("error")),
+        "attempted_at": now_iso() if requested else None,
+    }
+
+
 def _sync_sqlite_index(
     store: SQLiteStore,
     document_id: str,
@@ -100,6 +144,7 @@ def _sync_sqlite_index(
     md5: str,
     sha256: str,
     table_results: list[dict[str, Any]] | None = None,
+    replace_page_index: bool = True,
 ) -> None:
     store.upsert_document(
         {
@@ -124,8 +169,9 @@ def _sync_sqlite_index(
             "page_count": len(pages),
         }
     )
-    store.replace_pages(document_id, pages)
-    store.replace_document_tables(document_id, table_results or [])
+    if replace_page_index:
+        store.replace_pages(document_id, pages)
+        store.replace_document_tables(document_id, table_results or [])
 
 
 def ingest_pdf(
@@ -141,14 +187,21 @@ def ingest_pdf(
     write_full_text: bool = False,
     write_markdown: bool = False,
     overwrite: bool = False,
+    pre_extracted_pages: list[PdfPage] | None = None,
+    precomputed_md5: str | None = None,
+    precomputed_sha256: str | None = None,
 ) -> dict[str, Any]:
     path = Path(pdf_path).expanduser().resolve()
     if not path.exists():
         raise FileNotFoundError(path)
     meta = meta or {}
-    md5 = file_md5(path)
-    sha = file_sha256(path)
-    document_id = document_id or build_document_id(meta, fallback_title=path.stem)
+    if precomputed_md5 and precomputed_sha256:
+        md5, sha = precomputed_md5, precomputed_sha256
+    else:
+        md5, sha = file_hashes(path)
+    document_id = validate_document_id(
+        document_id or build_document_id(meta, fallback_title=path.stem)
+    )
     paths = get_data_paths()
     out_dir = paths.parsed_document_dir(document_id)
     meta_path = out_dir / "meta.json"
@@ -159,10 +212,63 @@ def ingest_pdf(
     write_full_text = write_full_text or mode == "full"
     write_markdown = write_markdown or mode == "full"
 
+    cache_status = "forced_overwrite" if overwrite else "miss"
+    cached_meta: dict[str, Any] | None = None
+    cached_pages: list[PdfPage] | None = None
     if pages_path.exists() and meta_path.exists() and not overwrite:
-        old = json.loads(meta_path.read_text(encoding="utf-8"))
+        try:
+            cached_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            cache_status = "corrupt_cache"
+        else:
+            cached_sha = str(cached_meta.get("sha256") or "")
+            if not cached_sha:
+                cache_status = "stale_missing_hash"
+            elif cached_sha != sha:
+                cache_status = "stale_hash_mismatch"
+            else:
+                cache_status = "hit"
+
+    if cache_status == "hit":
+        try:
+            cached_pages = _read_pages_jsonl(pages_path)
+        except Exception:
+            cache_status = "corrupt_cache"
+
+    if cache_status == "hit" and cached_meta is not None and cached_pages is not None:
+        old = cached_meta
         old = _merge_meta(old, meta)
-        pages = _read_pages_jsonl(pages_path)
+        pages = cached_pages
+        try:
+            cached_quality = json.loads(quality_path.read_text(encoding="utf-8"))
+            if not isinstance(cached_quality, dict):
+                cached_quality = {}
+        except (OSError, ValueError):
+            cached_quality = {}
+        quality_schema_changed = False
+        quality_defaults: dict[str, Any] = {
+            "extraction_fallback_pages": [
+                page.page_no
+                for page in pages
+                if page.extraction_method == "pypdf_fallback"
+            ],
+            "extraction_failed_pages": [
+                page.page_no for page in pages if page.extraction_method == "failed"
+            ],
+        }
+        quality_defaults["extraction_issue_count"] = (
+            len(quality_defaults["extraction_fallback_pages"])
+            + len(quality_defaults["extraction_failed_pages"])
+        )
+        for key, value in quality_defaults.items():
+            if key not in cached_quality:
+                cached_quality[key] = value
+                quality_schema_changed = True
+        if quality_schema_changed:
+            _write_json_atomic(quality_path, cached_quality)
+        old["quality_report_path"] = str(quality_path)
+        old["quality"] = cached_quality
+        enhancements_built: list[str] = []
         if write_full_text or write_markdown:
             full_text_path, markdown_path_value = _write_optional_text_outputs(
                 path,
@@ -176,8 +282,45 @@ def ingest_pdf(
             )
             if full_text_path:
                 old["full_text_path"] = full_text_path
+                enhancements_built.append("full_text")
             if markdown_path_value:
                 old["markdown_path"] = markdown_path_value
+                enhancements_built.append("markdown")
+
+        should_extract_tables = _should_extract_tables(mode, extract_tables_opt, pages)
+        cached_tables = old.get("tables")
+        cached_table_results = cached_tables if isinstance(cached_tables, list) else []
+        old_table_state = old.get("table_extraction")
+        table_completed = (
+            isinstance(old_table_state, dict)
+            and old_table_state.get("status") == "completed"
+        ) or bool(
+            cached_table_results
+            and not any(item.get("error") for item in cached_table_results)
+        )
+        if should_extract_tables and not table_completed:
+            cached_table_results = extract_tables(
+                path,
+                out_dir / "tables",
+                pages=_table_candidate_pages(pages),
+            )
+            old["tables"] = cached_table_results
+            old["extract_tables"] = True
+            old["table_extraction"] = _table_extraction_state(cached_table_results, True)
+            enhancements_built.append(
+                "tables_failed"
+                if old["table_extraction"]["status"] == "failed"
+                else "tables"
+            )
+
+        vector_path = old.get("vector_index_path")
+        vector_requested = build_vector_index_opt or mode == "full"
+        vector_exists = bool(vector_path and Path(str(vector_path)).exists())
+        if vector_requested and not vector_exists:
+            vector = build_vector_index(document_id, pages, paths.index / "vector_store")
+            vector_path = vector.get("vector_index_path")
+            old["vector_index_path"] = vector_path
+            enhancements_built.append("vector_manifest")
         full_text_path = str(text_path) if text_path.exists() else old.get("full_text_path")
         markdown_path_value = str(markdown_path) if markdown_path.exists() else old.get("markdown_path")
         old.update(
@@ -201,8 +344,13 @@ def ingest_pdf(
                 "sqlite_synced_at": now_iso(),
             }
         )
-        meta_path.write_text(json.dumps(old, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        _write_json_atomic(meta_path, old)
         store = SQLiteStore()
+        sqlite_index_reused = store.document_index_is_consistent(
+            document_id,
+            sha,
+            len(pages),
+        )
         _sync_sqlite_index(
             store,
             document_id,
@@ -215,9 +363,14 @@ def ingest_pdf(
             old.get("markdown_path"),
             md5,
             sha,
-            old.get("tables") or [],
+            cached_table_results,
+            replace_page_index=not sqlite_index_reused,
         )
-        store.log_ingest(document_id, str(path), "ok_cached")
+        store.log_ingest(
+            document_id,
+            str(path),
+            "ok_cached_index_reused" if sqlite_index_reused else "ok_cached_index_rebuilt",
+        )
         result = PdfIngestResult(
             document_id=document_id,
             pdf_path=str(path),
@@ -233,12 +386,23 @@ def ingest_pdf(
             fts_enabled=True,
             vector_index_path=old.get("vector_index_path"),
         )
-        return result.to_dict()
+        payload = result.to_dict()
+        payload.update(
+            {
+                "cache_status": "hit",
+                "ingest_cache_hit": True,
+                "ingested": False,
+                "reingested": False,
+                "sqlite_index_reused": sqlite_index_reused,
+                "cache_enhanced": bool(enhancements_built),
+                "enhancements_built": enhancements_built,
+            }
+        )
+        return payload
 
-    pages = extract_pages(path, ocr=ocr, ocr_lang=ocr_lang)
+    pages = pre_extracted_pages or extract_pages(path, ocr=ocr, ocr_lang=ocr_lang)
     quality = assess_pages(pages)
     write_jsonl(pages_path, [page.to_dict() for page in pages])
-    all_text = "\n\n".join(page.text for page in pages)
     full_text_path, markdown_path_value = _write_optional_text_outputs(
         path,
         pages,
@@ -250,29 +414,21 @@ def ingest_pdf(
         layout_mode,
     )
 
-    should_extract_tables = (
-        mode == "full"
-        or extract_tables_opt is True
-        or (
-            extract_tables_opt == "auto"
-            and any(keyword in all_text for keyword in ["募集资金", "前五大客户", "主营构成", "分部收入", "资产负债表", "利润表", "现金流量表"])
-        )
-    )
+    should_extract_tables = _should_extract_tables(mode, extract_tables_opt, pages)
     table_results: list[dict[str, Any]] = []
     if should_extract_tables:
-        candidate_pages = [
-            page.page_no
-            for page in pages
-            if any(keyword in page.text for keyword in ["募集资金", "前五大客户", "主营", "分部", "资产负债表", "利润表", "现金流量表"])
-        ] or None
-        table_results = extract_tables(path, out_dir / "tables", pages=candidate_pages)
+        table_results = extract_tables(
+            path,
+            out_dir / "tables",
+            pages=_table_candidate_pages(pages),
+        )
 
     vector_path = None
     if build_vector_index_opt or mode == "full":
         vector = build_vector_index(document_id, pages, paths.index / "vector_store")
         vector_path = vector.get("vector_index_path")
 
-    quality_path.write_text(json.dumps(quality, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_json_atomic(quality_path, quality)
     meta_full = {
         **meta,
         "document_id": document_id,
@@ -288,6 +444,7 @@ def ingest_pdf(
         "char_count": quality["char_count"],
         "quality": quality,
         "tables": table_results,
+        "table_extraction": _table_extraction_state(table_results, should_extract_tables),
         "vector_index_path": vector_path,
         "ingest_mode": mode,
         "extract_tables": should_extract_tables,
@@ -302,7 +459,7 @@ def ingest_pdf(
         },
         "ingested_at": now_iso(),
     }
-    meta_path.write_text(json.dumps(meta_full, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    _write_json_atomic(meta_path, meta_full)
 
     store = SQLiteStore()
     _sync_sqlite_index(
@@ -321,7 +478,7 @@ def ingest_pdf(
     )
     store.log_ingest(document_id, str(path), "ok")
 
-    return PdfIngestResult(
+    payload = PdfIngestResult(
         document_id=document_id,
         pdf_path=str(path),
         meta_path=str(meta_path),
@@ -336,3 +493,13 @@ def ingest_pdf(
         fts_enabled=True,
         vector_index_path=vector_path,
     ).to_dict()
+    payload.update(
+        {
+            "cache_status": cache_status,
+            "ingest_cache_hit": False,
+            "ingested": True,
+            "reingested": cache_status
+            in {"stale_hash_mismatch", "stale_missing_hash", "corrupt_cache", "forced_overwrite"},
+        }
+    )
+    return payload

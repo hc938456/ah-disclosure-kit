@@ -1,12 +1,20 @@
 # B3 HKEX
 
-相关文档：[README](../README.md) | [A0.文档索引](./A0_DOC_INDEX.md) | [A1.安装使用](./A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](./A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](./A3_WORKFLOW.md) | [A4.MCP函数](./A4_MCP_TOOLS.md) | [B1.PDF Ingest](./B1_PDF_INGEST.md) | [B2.公司数据](./B2_COMPANY_DATA.md) | [B3.HKEX](./B3_HKEX.md) | [B4.招股书](./B4_PROSPECTUS.md) | [C1.测试计划](./C1_TEST_PLAN.md) | [D1.开发计划](./D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../CHANGELOG.md)
+文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
 
 本文说明港股披露文件查询为什么需要 HKEX `stockId`，以及当前工具的边界。
 
 ## 1. 港股代码和 HKEX stockId
 
 HKEXnews 的很多公告查询 URL 使用内部 `stockId`。
+
+HKEX标题筛选接口不能无条件视为完整候选集。例如以`Annual Report`筛选时，可能漏掉`Annual Report and Accounts 2025 (with employee share plans)`等标题变体。当前流程会先检查标题、年度、排除词和HKEX文件大小；明确且不小于1MB的标准年报直接进入下载校验，只有结果缺失、过小或不确定时才查询同一公司的全部公告。这样保留特殊标题召回能力，同时避免多数标准年报固定执行两次HKEX请求。
+
+同一股票代码、语言和标题关键词的HKEX查询共用一份来源缓存，`max_rows`只控制返回给调用方的本地截取条数。首次远程查询会缓存当前页面的完整候选，因此先查询20条、随后查询10条不会再次访问HKEX。旧版带`max_rows`的缓存会在安全确认未截断时自动迁移。
+
+公开代码到`stockId`采用按需永久缓存，并非一次性下载全部港股映射。同一工作线程复用HKEX HTTP Session；已验证缓存不会在来源查询中重复验证。只有明确设置`refresh=true`才重新核对身份映射，刷新失败保留原记录。
+
+`海外監管公告`中可能附带A股年度报告。该文件即使篇幅完整，也不能作为H股年报使用；港股年报流程必须将其标记为错误文档变体，并继续寻找HKEX英文年报对应的繁体中文版。
 
 `stockId` 不是 5 位港股代码。
 
@@ -21,7 +29,7 @@ HKEX stockId：需要通过 HKEX 查询或缓存解析
 
 ```text
 港股代码
--> resolve_hkex_stock_id_tool
+-> resolve_hkex_stock_id
 -> 校验 Stock Code / Short Name
 -> search_h_filings
 -> download
@@ -43,7 +51,7 @@ HKEX stockId：需要通过 HKEX 查询或缓存解析
 
 ## 3. 不支持的能力
 
-v1.0 不提供完整结构化的“某一年至今港股新增 IPO 公司列表”。
+当前版本不提供完整结构化的“某一年至今港股新增 IPO 公司列表”。
 
 如果用户问：
 

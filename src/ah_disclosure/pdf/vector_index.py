@@ -7,8 +7,7 @@ from ah_disclosure.models import PdfPage
 
 
 def build_vector_index(document_id: str, pages: list[PdfPage], output_dir: str | Path) -> dict:
-    # Lightweight placeholder index. If a user installs vector dependencies, this can be swapped
-    # for ChromaDB / sentence-transformers without changing the service contract.
+    # 这里只创建轻量清单，供外部向量后端按稳定契约接管；Kit 本身不声称已生成 embeddings。
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"{document_id}_vector_manifest.json"
@@ -17,7 +16,7 @@ def build_vector_index(document_id: str, pages: list[PdfPage], output_dir: str |
         "engine": "manifest-only",
         "page_count": len(pages),
         "status": "created",
-        "note": "Install [vector] extras and replace vector_index.py to build embeddings.",
+        "note": "This is a manifest for an external vector backend; no embeddings were generated.",
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"vector_index_path": str(path), **payload}

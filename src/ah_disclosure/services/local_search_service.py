@@ -1,14 +1,57 @@
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from ah_disclosure.models import EvidenceItem, EvidencePacket
+from ah_disclosure.models import PdfPage
+from ah_disclosure.pdf.quality import assess_pages
 from ah_disclosure.storage.sqlite_store import SQLiteStore
 from ah_disclosure.core.time_utils import now_iso
 from ah_disclosure.services.cleanup_service import cleanup_company, cleanup_document, reconcile_local_documents
 
 
+def _page_table_structures(
+    records: list[dict],
+) -> tuple[str | None, dict | None]:
+    """Load bounded structural metadata; page text remains the source for table values."""
+    tables: list[dict] = []
+    table_path: str | None = None
+    for record in records:
+        table_path = table_path or record.get("table_path")
+        structure_path = record.get("structure_path")
+        payload: dict = {
+            "table_index": record.get("table_index"),
+            "quality_flags": record.get("quality_flags") or [],
+        }
+        if structure_path:
+            try:
+                raw = json.loads(Path(structure_path).read_text(encoding="utf-8"))
+                header_depth = int(raw.get("header_depth") or 0)
+                payload.update(
+                    {
+                        "header_depth": header_depth,
+                        "confidence": raw.get("confidence"),
+                        "column_paths": (raw.get("column_paths") or [])[:40],
+                        "header_rows": (raw.get("raw_rows") or [])[:header_depth],
+                        "row_count": raw.get("row_count"),
+                        "column_count": raw.get("column_count"),
+                    }
+                )
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                payload["quality_flags"] = [
+                    *payload["quality_flags"],
+                    "structure_unreadable",
+                ]
+        tables.append(payload)
+    return table_path, {"tables": tables} if tables else None
+
+
 ACCOUNTING_POLICY_BASE_QUERIES: list[tuple[str, str]] = [
     ("revenue recognition", "accounting_policy"),
     ("收入确认", "accounting_policy"),
+    ("收入確認", "accounting_policy"),
     ("summary of material accounting policies", "policy_section"),
     ("significant accounting policies", "policy_section"),
     ("critical accounting estimates", "critical_estimate"),
@@ -17,6 +60,10 @@ ACCOUNTING_POLICY_BASE_QUERIES: list[tuple[str, str]] = [
     ("cost of revenues", "cost_of_revenues"),
     ("selling and marketing expenses", "mda"),
     ("segment information", "segment_note"),
+    ("重大會計政策", "policy_section"),
+    ("關鍵會計估計", "critical_estimate"),
+    ("管理層討論及分析", "mda"),
+    ("分部資料", "segment_note"),
 ]
 
 INCENTIVE_ACCOUNTING_QUERIES: list[tuple[str, str]] = [
@@ -37,29 +84,46 @@ INCENTIVE_ACCOUNTING_QUERIES: list[tuple[str, str]] = [
     ("骑手", "cost_of_revenues"),
 ]
 
-FINANCIAL_ANALYSIS_QUERIES: list[tuple[str, str]] = [
+BUSINESS_MODEL_QUERIES: list[tuple[str, str]] = [
     ("management discussion and analysis", "mda"),
-    ("revenues by segment and type", "revenue_breakdown"),
-    ("revenues by type", "revenue_breakdown"),
-    ("Core Local Commerce", "segment_note"),
-    ("New Initiatives", "segment_note"),
-    ("Delivery services", "revenue_breakdown"),
-    ("Commission", "revenue_breakdown"),
-    ("Online marketing services", "revenue_breakdown"),
-    ("Other services and sales", "revenue_breakdown"),
+    ("business review", "mda"),
+    ("segment information", "segment_note"),
+    ("operating segments", "segment_note"),
+    ("reportable segments", "segment_note"),
+    ("disaggregation of revenue", "revenue_breakdown"),
+    ("revenue by segment", "revenue_breakdown"),
+    ("revenue by products and services", "revenue_breakdown"),
+    ("major products and services", "revenue_breakdown"),
+    ("principal activities", "revenue_breakdown"),
+    ("管理层讨论与分析", "mda"),
+    ("业务概览", "mda"),
+    ("分部信息", "segment_note"),
+    ("经营分部", "segment_note"),
+    ("报告分部", "segment_note"),
+    ("收入分解", "revenue_breakdown"),
+    ("营业收入分行业", "revenue_breakdown"),
+    ("营业收入分产品", "revenue_breakdown"),
+    ("主营业务分行业", "revenue_breakdown"),
+    ("主营业务分产品", "revenue_breakdown"),
+    ("主要产品和服务", "revenue_breakdown"),
+    ("主营业务", "revenue_breakdown"),
+    ("管理層討論及分析", "mda"),
+    ("業務概覽", "mda"),
+    ("分部資料", "segment_note"),
+    ("經營分部", "segment_note"),
+    ("報告分部", "segment_note"),
+    ("收入分拆", "revenue_breakdown"),
+    ("按產品劃分的收入", "revenue_breakdown"),
+    ("主要產品及服務", "revenue_breakdown"),
+    ("主要業務", "revenue_breakdown"),
+]
+
+FINANCIAL_ANALYSIS_QUERIES: list[tuple[str, str]] = [
+    *BUSINESS_MODEL_QUERIES,
     ("cost of revenues", "cost_of_revenues"),
     ("selling and marketing expenses", "mda"),
-    ("operating loss from the Core Local Commerce", "segment_note"),
-    ("operating loss from the Core Local Commerce segment was", "segment_note"),
-    ("operating profit from the Core Local Commerce", "segment_note"),
-    ("operating loss and operating margin in 2025", "segment_note"),
     ("operating margin", "segment_note"),
-    ("Number of On-demand Delivery transactions", "kpi_driver"),
-    ("GTV", "kpi_driver"),
     ("expenses by nature", "expense_note"),
-    ("promotion advertising user incentives", "expense_note"),
-    ("courier incentives", "cost_of_revenues"),
-    ("deducted from revenues", "net_revenue"),
 ]
 
 ACCOUNTING_QUERY_HINTS = [
@@ -110,14 +174,62 @@ FINANCIAL_ANALYSIS_HINTS = [
     "利润",
     "盈利",
     "亏损",
+    "收入模式",
+    "收入来源",
+    "业务分部",
+    "业务板块",
+    "产品结构",
+    "分行业",
+    "分产品",
+    "主营业务",
+    "業務分部",
+    "業務板塊",
+    "產品結構",
+    "收入模式",
+    "收入來源",
+    "分行業",
+    "分產品",
+    "主要業務",
     "margin",
     "driver",
     "forecast",
     "budget",
     "p&l",
+    "revenue model",
+    "revenue stream",
+    "revenue breakdown",
+    "operating segment",
+    "reportable segment",
+    "business segment",
+]
+
+BUSINESS_MODEL_QUERY_HINTS = [
+    "收入模式",
+    "收入来源",
+    "业务分部",
+    "业务板块",
+    "产品结构",
+    "分行业",
+    "分产品",
+    "主营业务",
+    "業務分部",
+    "業務板塊",
+    "產品結構",
+    "收入模式",
+    "收入來源",
+    "分行業",
+    "分產品",
+    "主要業務",
+    "revenue model",
+    "revenue stream",
+    "revenue breakdown",
+    "operating segment",
+    "reportable segment",
+    "business segment",
 ]
 
 EVIDENCE_TYPE_PRIORITY = {
+    "biography": 105,
     "accounting_policy": 100,
     "net_revenue": 95,
     "revenue_breakdown": 90,
@@ -134,8 +246,10 @@ EVIDENCE_TYPE_PRIORITY = {
 }
 
 EVIDENCE_TYPE_ORDER = [
+    "biography",
     "accounting_policy",
     "net_revenue",
+    "user_query",
     "revenue_breakdown",
     "cost_of_revenues",
     "expense_note",
@@ -144,12 +258,12 @@ EVIDENCE_TYPE_ORDER = [
     "segment_note",
     "critical_estimate",
     "incentive",
-    "user_query",
     "policy_section",
     "adjacent",
 ]
 
 EVIDENCE_TYPE_QUOTAS = {
+    "biography": 4,
     "accounting_policy": 4,
     "net_revenue": 2,
     "revenue_breakdown": 3,
@@ -160,7 +274,7 @@ EVIDENCE_TYPE_QUOTAS = {
     "segment_note": 1,
     "critical_estimate": 1,
     "incentive": 2,
-    "user_query": 1,
+    "user_query": 2,
     "policy_section": 1,
     "adjacent": 0,
 }
@@ -212,8 +326,11 @@ def _accounting_policy_queries(query: str) -> list[tuple[str, str]]:
 
 def _financial_analysis_queries(query: str) -> list[tuple[str, str]]:
     queries: list[tuple[str, str]] = [(query, "user_query")]
-    queries.extend(FINANCIAL_ANALYSIS_QUERIES)
     query_lower = query.casefold()
+    if any(hint.casefold() in query_lower for hint in BUSINESS_MODEL_QUERY_HINTS):
+        queries.extend(BUSINESS_MODEL_QUERIES)
+    else:
+        queries.extend(FINANCIAL_ANALYSIS_QUERIES)
     if any(hint.casefold() in query_lower for hint in INCENTIVE_QUERY_HINTS):
         queries.extend(INCENTIVE_ACCOUNTING_QUERIES)
     return _dedupe_queries(queries)
@@ -225,7 +342,29 @@ def _best_evidence_type(evidence_types: set[str]) -> str:
     return max(evidence_types, key=lambda item: EVIDENCE_TYPE_PRIORITY.get(item, 0))
 
 
+BIOGRAPHY_SNIPPET_CUES = (
+    "出生",
+    "毕业",
+    "学历",
+    "学士",
+    "硕士",
+    "博士",
+    "历任",
+    "工作经历",
+    "aged",
+    "degree",
+    "graduated",
+    "obtained",
+    "prior to joining",
+    "experience",
+    "served as",
+    "worked at",
+)
+
+
 def _select_diverse_hits(hits: list[dict], max_pages: int) -> list[dict]:
+    if max_pages <= 0:
+        return []
     def sort_key(item: dict) -> tuple[int, int, int]:
         evidence_priority = max((EVIDENCE_TYPE_PRIORITY.get(et, 0) for et in item["evidence_types"]), default=0)
         direct_hit = 0 if item.get("is_adjacent") else 1
@@ -235,7 +374,12 @@ def _select_diverse_hits(hits: list[dict], max_pages: int) -> list[dict]:
         matched = {str(query).casefold() for query in item["matched_queries"]}
         snippets = " ".join(str(snippet) for snippet in item.get("snippets", [])).casefold()
         type_bonus = 0
-        if evidence_type == "accounting_policy":
+        if evidence_type == "biography":
+            cue_count = sum(1 for cue in BIOGRAPHY_SNIPPET_CUES if cue in snippets)
+            type_bonus += cue_count * 35
+            if len(snippets) >= 120:
+                type_bonus += 20
+        elif evidence_type == "accounting_policy":
             if "transacting user incentives" in matched:
                 type_bonus += 60
             if "transacting users incentives" in matched:
@@ -245,12 +389,21 @@ def _select_diverse_hits(hits: list[dict], max_pages: int) -> list[dict]:
             if "revenue recognition" in matched or "收入确认" in matched:
                 type_bonus += 40
         elif evidence_type == "revenue_breakdown":
-            if "revenues by segment and type" in matched or "revenues by type" in matched:
+            if any(
+                query in matched
+                for query in {
+                    "disaggregation of revenue",
+                    "revenue by segment",
+                    "revenue by products and services",
+                    "营业收入分行业",
+                    "营业收入分产品",
+                    "主营业务分行业",
+                    "主营业务分产品",
+                }
+            ):
                 type_bonus += 80
-            if "delivery services" in matched:
+            if "major products and services" in matched or "主要产品和服务" in matched:
                 type_bonus += 50
-            if "core local commerce" in matched:
-                type_bonus += 30
         elif evidence_type == "expense_note":
             if "expenses by nature" in matched:
                 type_bonus += 80
@@ -273,20 +426,22 @@ def _select_diverse_hits(hits: list[dict], max_pages: int) -> list[dict]:
             if "gtv" in matched:
                 type_bonus += 50
         elif evidence_type == "segment_note":
-            if "year ended" in snippets or " in 2025" in snippets:
+            if "year ended" in snippets:
                 type_bonus += 120
             if "fourth quarter" in snippets:
                 type_bonus -= 40
-            if "operating loss and operating margin in 2025" in matched:
-                type_bonus += 90
-            if "operating loss from the core local commerce segment was" in matched:
+            if any(
+                query in matched
+                for query in {
+                    "segment information",
+                    "operating segments",
+                    "reportable segments",
+                    "分部信息",
+                    "经营分部",
+                    "报告分部",
+                }
+            ):
                 type_bonus += 80
-            if "operating loss from the core local commerce" in matched:
-                type_bonus += 70
-            if "operating profit from the core local commerce" in matched:
-                type_bonus += 60
-            if "core local commerce" in matched:
-                type_bonus += 40
         direct_hit = 0 if item.get("is_adjacent") else 1
         return (type_bonus, direct_hit, len(item["matched_queries"]), sort_key(item)[0])
 
@@ -323,6 +478,8 @@ def _select_diverse_hits(hits: list[dict], max_pages: int) -> list[dict]:
 
 
 def _excerpt_around_terms(text: str, terms: list[str], max_len: int) -> str:
+    if max_len <= 0:
+        return ""
     compact = str(text or "")
     if len(compact) <= max_len:
         return compact
@@ -335,6 +492,25 @@ def _excerpt_around_terms(text: str, terms: list[str], max_len: int) -> str:
         idx = lowered.find(clean.casefold())
         if idx >= 0:
             hit_index = idx
+            break
+        # PDF text frequently inserts line breaks or unusual spacing inside a
+        # phrase. Fall back to the longest meaningful component so the excerpt
+        # still centers on the evidence instead of returning the page header.
+        components = sorted(
+            {
+                component.casefold()
+                for component in re.findall(r"[\w\u3400-\u9fff]+", clean)
+                if len(component) >= 3
+            },
+            key=len,
+            reverse=True,
+        )
+        for component in components:
+            idx = lowered.find(component)
+            if idx >= 0:
+                hit_index = idx
+                break
+        if hit_index >= 0:
             break
     if hit_index < 0:
         return compact[:max_len]
@@ -360,6 +536,17 @@ def _estimate_structured_tokens(structured_data: dict) -> int:
 class LocalSearchService:
     def __init__(self) -> None:
         self.store = SQLiteStore()
+        self._table_records_cache: dict[str, dict[int, list[dict]]] = {}
+
+    def _document_table_records(self, document_id: str) -> dict[int, list[dict]]:
+        cached = self._table_records_cache.get(document_id)
+        if cached is not None:
+            return cached
+        grouped: dict[int, list[dict]] = {}
+        for record in self.store.get_document_tables(document_id):
+            grouped.setdefault(int(record.get("page_no") or 0), []).append(record)
+        self._table_records_cache[document_id] = grouped
+        return grouped
 
     def search(self, query: str, document_id: str | None = None, limit: int = 8, reconcile: bool = True) -> list[dict]:
         if reconcile:
@@ -381,7 +568,9 @@ class LocalSearchService:
             reconcile_local_documents(scan_raw=False, remove_orphan_parsed=False)
         return self.store.get_document_meta(document_id)
 
-    def evidence_packet(self, query: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, strategy: str = "auto", include_retrieval_plan: bool = False) -> dict:
+    def evidence_packet(self, query: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, strategy: str = "auto", include_retrieval_plan: bool = False, reconcile: bool = True) -> dict:
+        max_pages = max(0, int(max_pages))
+        max_chars = max(0, int(max_chars))
         if _should_use_accounting_strategy(query, strategy):
             return self.accounting_policy_evidence_packet(
                 query,
@@ -394,6 +583,7 @@ class LocalSearchService:
                 structured_data=structured_data,
                 strategy=strategy,
                 include_retrieval_plan=include_retrieval_plan,
+                reconcile=reconcile,
             )
         if _should_use_financial_strategy(query, strategy):
             return self.financial_analysis_evidence_packet(
@@ -407,8 +597,13 @@ class LocalSearchService:
                 structured_data=structured_data,
                 strategy=strategy,
                 include_retrieval_plan=include_retrieval_plan,
+                reconcile=reconcile,
             )
-        results = self.search(query, document_id, max_pages)
+        results = (
+            self.search(query, document_id, max_pages, reconcile=reconcile)
+            if max_pages > 0 and max_chars > 0
+            else []
+        )
         items: list[EvidenceItem] = []
         total_chars = 0
         truncated = False
@@ -442,7 +637,7 @@ class LocalSearchService:
         packet = EvidencePacket(query=query, route="local_document", market=market, symbol=symbol, company_name=company_name, evidence_items=items, token_estimate=max(1, total_chars // 3 + structured_tokens), max_chars=max_chars, truncated=truncated, generated_at=now_iso())
         return packet.to_dict()
 
-    def accounting_policy_evidence_packet(self, query: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, strategy: str = "accounting_policy", include_retrieval_plan: bool = False) -> dict:
+    def accounting_policy_evidence_packet(self, query: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, strategy: str = "accounting_policy", include_retrieval_plan: bool = False, reconcile: bool = True) -> dict:
         return self.planned_evidence_packet(
             query,
             queries=_accounting_policy_queries(query),
@@ -455,9 +650,10 @@ class LocalSearchService:
             max_chars=max_chars,
             structured_data=structured_data,
             include_retrieval_plan=include_retrieval_plan,
+            reconcile=reconcile,
         )
 
-    def financial_analysis_evidence_packet(self, query: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, strategy: str = "financial_analysis", include_retrieval_plan: bool = False) -> dict:
+    def financial_analysis_evidence_packet(self, query: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, strategy: str = "financial_analysis", include_retrieval_plan: bool = False, reconcile: bool = True) -> dict:
         return self.planned_evidence_packet(
             query,
             queries=_financial_analysis_queries(query),
@@ -470,14 +666,23 @@ class LocalSearchService:
             max_chars=max_chars,
             structured_data=structured_data,
             include_retrieval_plan=include_retrieval_plan,
+            reconcile=reconcile,
         )
 
-    def planned_evidence_packet(self, query: str, queries: list[tuple[str, str]], resolved_strategy: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, include_retrieval_plan: bool = False) -> dict:
-        reconcile_summary = reconcile_local_documents(scan_raw=False, remove_orphan_parsed=False)
-        per_query_limit = max(3, min(8, max_pages))
+    def planned_evidence_packet(self, query: str, queries: list[tuple[str, str]], resolved_strategy: str, market: str | None = None, symbol: str | None = None, company_name: str | None = None, document_id: str | None = None, max_pages: int = 8, max_chars: int = 12000, structured_data: dict | None = None, include_retrieval_plan: bool = False, reconcile: bool = True) -> dict:
+        max_pages = max(0, int(max_pages))
+        max_chars = max(0, int(max_chars))
+        reconcile_summary = (
+            reconcile_local_documents(scan_raw=False, remove_orphan_parsed=False)
+            if reconcile
+            else {"stale_count": 0, "orphan_parsed_count": 0, "skipped": True}
+        )
+        has_biography_query = any(evidence_type == "biography" for _, evidence_type in queries)
+        per_query_limit = 24 if has_biography_query else max(3, min(8, max_pages))
         page_hits: dict[tuple[str | None, int], dict] = {}
 
-        for search_query, evidence_type in queries:
+        bounded_queries = queries if max_pages > 0 and max_chars > 0 else []
+        for search_query, evidence_type in bounded_queries:
             for result in self.search(search_query, document_id, per_query_limit, reconcile=False):
                 page_no = int(result.get("page_no") or 0)
                 if page_no <= 0:
@@ -532,22 +737,33 @@ class LocalSearchService:
             for page in self.get_pages(hit_document_id, sorted(set(page_numbers)), limit=max_pages, reconcile=False):
                 pages[(hit_document_id, int(page.get("page_no") or 0))] = page
 
+        table_records_by_page: dict[tuple[str, int], list[dict]] = {}
+        for hit_document_id, page_numbers in pages_by_document.items():
+            records_by_page = self._document_table_records(hit_document_id)
+            for page_no in set(page_numbers):
+                table_records_by_page[(hit_document_id, page_no)] = records_by_page.get(
+                    page_no,
+                    [],
+                )
+
         meta_cache: dict[str, dict] = {}
         items: list[EvidenceItem] = []
         included_hits: list[dict] = []
         total_chars = 0
         truncated = False
-        per_page_chars = max(800, min(2500, max_chars // max(1, max_pages)))
+        per_page_chars = min(2500, max_chars // max(1, max_pages))
 
         for hit in selected_hits:
             hit_document_id = str(hit.get("document_id") or document_id or "")
             if not hit_document_id:
                 continue
             page_no = int(hit["page_no"])
-            page = pages.get((hit_document_id, page_no))
-            if not page:
+            page_record = pages.get((hit_document_id, page_no))
+            if not page_record:
                 continue
-            if hit.get("is_adjacent") and not _useful_adjacent_text(str(page.get("text") or ""), page_no):
+            if hit.get("is_adjacent") and not _useful_adjacent_text(
+                str(page_record.get("text") or ""), page_no
+            ):
                 continue
             matched_queries = sorted(hit["matched_queries"])
             evidence_type = _best_evidence_type(set(hit["evidence_types"]))
@@ -556,13 +772,19 @@ class LocalSearchService:
                 truncated = True
                 break
             text_limit = min(per_page_chars, remaining_chars)
-            text = _excerpt_around_terms(str(page.get("text") or ""), matched_queries or [query], text_limit)
+            text = _excerpt_around_terms(
+                str(page_record.get("text") or ""), matched_queries or [query], text_limit
+            )
             if len(text) >= remaining_chars:
                 truncated = True
             meta = meta_cache.get(hit_document_id)
             if meta is None:
-                meta = self.get_document_meta(hit_document_id, reconcile=False)
+                meta = self.get_document_meta(hit_document_id, reconcile=False) or {}
                 meta_cache[hit_document_id] = meta
+            table_key = (hit_document_id, page_no)
+            table_path, table_structure = _page_table_structures(
+                table_records_by_page.get(table_key, [])
+            )
             items.append(
                 EvidenceItem(
                     source_type="page",
@@ -573,6 +795,8 @@ class LocalSearchService:
                     page_no=page_no,
                     section_title=f"{evidence_type}; matched={', '.join(matched_queries) if matched_queries else 'adjacent'}",
                     text=text,
+                    table_path=table_path,
+                    structured_payload=table_structure,
                     source_url=meta.get("pdf_url") or meta.get("detail_url"),
                     local_pdf_path=meta.get("local_pdf_path"),
                     token_estimate=max(1, len(text) // 3),
@@ -642,6 +866,31 @@ class LocalSearchService:
         else:
             compact_plan["detail_omitted"] = "set include_retrieval_plan=true for search queries and page-level matches"
         packet["retrieval_plan"] = compact_plan
+        if not seed_keys and document_id and max_pages > 0 and max_chars > 0:
+            # A bounded sample is enough to flag likely extraction corruption;
+            # never materialize an entire large filing merely because a query missed.
+            indexed_pages = self.get_pages(document_id, pages=None, limit=64, reconcile=False)
+            quality = assess_pages(
+                [
+                    PdfPage(
+                        int(page.get("page_no") or 0),
+                        str(page.get("text") or ""),
+                        int(page.get("char_count") or len(str(page.get("text") or ""))),
+                    )
+                    for page in indexed_pages
+                ]
+            )
+            if quality.get("garbled_page_ratio", 0) >= 0.05:
+                packet["requires_ocr"] = True
+                packet["quality_warning"] = (
+                    "The indexed PDF text contains many garbled/control-character pages. "
+                    "Re-ingest with ocr='force' and overwrite=true before relying on an empty result."
+                )
+                packet["text_quality"] = {
+                    "page_count": quality.get("page_count"),
+                    "garbled_suspect_page_count": len(quality.get("garbled_suspect_pages") or []),
+                    "garbled_page_ratio": quality.get("garbled_page_ratio"),
+                }
         return packet
 
 

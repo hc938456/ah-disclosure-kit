@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install quality tools
+        run: python -m pip install -e ".[pdf,dev]"
+      - name: Ruff
+        run: python -m ruff check src tests
+      - name: Mypy
+        run: python -m mypy src
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: python -m pip install -e ".[pdf,mcp]" pytest pillow pytesseract
+      - name: Tests
+        run: python -m pytest -q
+
+  full-install-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install advertised runtime extras
+        run: python -m pip install -e ".[pdf,company-data,mcp]"
+      - name: Verify CLI and real MCP runtime
+        run: |
+          python -m ah_disclosure.cli --version
+          python -m ah_disclosure.cli server-info
+          python -c "import ah_disclosure.mcp_server as m; assert m.mcp.__class__.__module__.startswith('mcp.')"
+
+  build:
+    needs: [quality, test, full-install-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build frontend
+        run: python -m pip install build
+      - name: Build source and wheel distributions
+        run: python -m build --sdist --wheel
+      - name: Smoke-test built wheel
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          python -m ah_disclosure.cli --version
+      - name: Upload release distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: ah-disclosure-kit-${{ github.run_id }}
+          path: dist/*
+          if-no-files-found: error

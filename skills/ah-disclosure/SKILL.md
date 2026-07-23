@@ -1,65 +1,71 @@
 ---
 name: ah-disclosure
-description: 用于 A/H 股非交易类公司信息、披露文件、招股书、年报、HKEXnews 文件、PDF 本地解析和本地证据检索。
+description: Retrieve structured A/H company data and download, ingest, search, audit, and analyze A-share and H-share disclosure documents through the ah_disclosure MCP server. Use for company profiles and business information, financial statements and indicators, dividends, shareholders, capital actions, governance/ESG, CNINFO or HKEXnews annual and interim reports, prospectuses, listing documents, local PDF evidence, accounting policies, management-analysis transformations, financial statement tie-outs, effective tax rate, working capital, cash flow, financing, and ROE/ROIC.
 ---
 
-# ah-disclosure Skill
+# A/H Disclosure
 
-相关文档：[A0.文档索引](../../docs/A0_DOC_INDEX.md) | [A1.安装使用](../../docs/A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](../../docs/A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](../../docs/A3_WORKFLOW.md) | [A4.MCP函数](../../docs/A4_MCP_TOOLS.md) | [B1.PDF Ingest](../../docs/B1_PDF_INGEST.md) | [B2.公司数据](../../docs/B2_COMPANY_DATA.md) | [B3.HKEX](../../docs/B3_HKEX.md) | [B4.招股书](../../docs/B4_PROSPECTUS.md) | [C1.测试计划](../../docs/C1_TEST_PLAN.md) | [D1.开发计划](../../docs/D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../../CHANGELOG.md)
+Use `ah_disclosure` as the deterministic backend. Let the LLM interpret flexible questions and design claims; let the Kit locate filings, ingest, retrieve bounded evidence, calculate, reconcile, detect conflicts, and block unsupported completion.
 
-## 1. 核心规则
+## Core rules
 
-1. 处理 A/H 股披露文件和公司数据时，优先使用 `ah-disclosure` MCP 工具，不优先使用 WebSearch。
-2. 结构化公司数据优先使用 AKShare-backed 工具。
-3. A 股原始公告、年报、中报、季报优先使用 CNINFO。
-4. 港股原始公告、年报、通函、业绩公告优先使用 HKEXnews。
-5. 招股书、上市文件、PHIP、募集说明书使用 Prospectus 相关工具。
-6. 如果用户只要求下载 PDF，只下载 PDF，并返回本地 PDF 路径和来源 URL。
-7. PDF 下载后，只有当用户要求读取、分析、搜索、摘要或准备后续证据检索时，才调用 `ingest_pdf_tool`。
-8. 默认 PDF ingest 只生成核心机器可读产物：`meta.json`、`pages.jsonl`、`quality_report.json` 和 SQLite FTS。默认不生成 `full_text.txt` 或 `document.md`。
-9. 只有当用户要求人工阅读导出、复核全文，或分析完成后确认需要便利文件时，才生成 `full_text.txt` 或 `document.md`。
-10. OCR 是本地、按需、质量触发能力。默认 `ocr="auto"` 只处理低文本页；只有 PDF 是扫描件、图片型、抽取质量差，或用户明确要求 OCR 时，才使用 `ocr="force"` 和 `overwrite=true`。
-11. 文档产物使用稳定命名：`MARKET_SYMBOL_YEAR_DOCUMENTTYPE_LANGUAGE_SHORTNAME`。英文文件使用 `EN`，中文文件使用 `ZH`；港股简称优先使用交易所英文简称，A 股简称优先使用中文简称。
-12. 不要手工删除 raw/parsed PDF 产物后忽略 SQLite。清理时使用 `cleanup_document_tool`、`cleanup_company_tool` 或 `reconcile_local_index_tool`。
-13. 默认不要把完整 `document.md` 或 `full_text.txt` 交给大模型。
-14. 分析前应构建或请求 EvidencePacket，只分析相关页、表格和结构化数据。
-15. 输出时尽量给出来源、URL、本地路径、页码和接口名。
-16. 对会计政策、披露文件分析、年报解释类问题，不要只依赖单一关键词。必须使用多路径检索：用户原语种关键词、英文会计/业务同义词、固定会计章节、相邻页扩展，以及会计政策、MD&A、附注和表格之间的交叉验证。
-17. 如果证据检索不完整，应明确说明，不要把弱推断当成已确认的披露事实。
-18. 当前工具不提供完整结构化的全年港股 IPO / 新上市公司列表。遇到“2026 年至今港股新增 IPO 公司 list”这类问题，应先说明 `ah-disclosure` 不支持该本地能力；如再使用 WebSearch 或外部来源，必须明确它不是本地 `ah-disclosure` 结果。
-19. 港股招股书 / 上市文件搜索以公司代码为范围。如果用户只给中文或英文公司名，没有港股代码或 hkex_stock_id，应先询问港股代码，不要进行慢速全市场扫描。
+1. Distinguish structured data, source lookup, download only, download plus ingest, simple evidence retrieval, and complex analysis.
+2. Do not ingest when the user only requests a URL or PDF download.
+3. Bind analysis to company, market, filing type, report period, language, and `document_id`.
+4. Treat search hits as candidates until page, table, headers, units, scope, and comparative period are reviewed.
+5. Use deterministic calculation tools for arithmetic and tie-outs; do not rely on LLM mental arithmetic.
+6. Separate disclosed facts, verified calculations, management reclassifications, and `⚠️ 推测`.
+7. Never return `sufficient` with unresolved gaps or present a failed tie-out as complete.
+8. Use cleanup tools with dry-run instead of manually deleting PDFs, parsed artifacts, or SQLite rows.
 
-## 2. 证据检索策略
+## Route the request
 
-会计政策或披露解释问题，优先使用 `get_evidence_packet_tool`，并设置 `strategy="accounting_policy"`。
+- Source or candidate only: use `find_filing_source_tool`.
+- Annual-report download only: use `download_report_tool`; do not ingest.
+- Annual-report download plus ingest: use `download_and_ingest_report` with `ingest=true`.
+- Prospectus or listing document: use `search_prospectus_tool`, then `download_prospectus_tool` for download only or `download_and_ingest_prospectus_tool` when ingest is required.
+- Local PDF ingest: use `ingest_pdf_tool`.
+- Structured company facts: use `get_company_profile_tool`, `get_financial_statements_tool`, `get_financial_indicators_tool`, `get_dividends_tool`, `get_shareholders_tool`, `get_capital_actions_tool`, or `get_governance_esg_tool` according to the requested dataset.
+- Business descriptions or composition: use `get_business_info_tool`.
+- Multi-source overview: use `build_company_dossier_tool`; use `compare_structured_data_with_report_tool` only for an explicit provider-versus-filing comparison.
+- Inspect existing local documents: use `list_local_documents_tool`, then `get_document_meta_tool` when details are needed.
+- Filing not yet ready for analysis: use `ensure_filing_evidence_tool`.
+- Already-ingested filing, simple question: use `get_evidence_packet_tool` with `strategy="accounting_policy"` or `strategy="financial_analysis"` when the intent is clear.
+- Clipped page or multi-page table: use `get_document_pages_tool`.
+- Complex, multi-claim, or non-standard question: use the analysis protocol below.
+- Installation, data-directory, or version uncertainty: call `server_info`.
 
-财务分析、FP&A、预算、预测、经营驱动、利润桥问题，优先使用 `strategy="financial_analysis"`。
+Read [Operations.md](references/Operations.md) for source, validation, ingest, OCR, cache, batch, and cleanup decisions.
 
-如果问题类型不明确，使用 `strategy="auto"`，由工具根据问题选择检索策略。
+## Analyze complex questions
 
-### 2.1 accounting_policy 策略
+1. Call `prepare_llm_analysis_tool`.
+2. Have the LLM define independent claims, dynamic multilingual queries, evidence requirements, dependencies, formulas, units, and completion criteria.
+3. Call `execute_llm_analysis_plan_tool`.
+4. Review each claim as `sufficient`, `partial`, `insufficient`, or `conflicting`.
+5. Use `continue_llm_analysis_tool` for missing evidence and `get_document_pages_tool` for clipped evidence.
+6. Call `verify_analysis_calculations_tool` with evidence-linked inputs.
+7. Answer only claims that pass the completion gates.
 
-1. 根据用户问题生成多组关键词，包括原语种关键词和英文会计/业务同义词。
-2. 搜索固定章节，例如 `revenue recognition`、`expenses by nature`、`segment information`、`management discussion and analysis`、`significant accounting policies`、`critical accounting estimates`。
-3. 扩展命中页的相邻页，因为定义和表格经常跨页。
-4. 尽量用至少两类证据交叉验证，例如会计政策、MD&A、附注或表格。
-5. 只返回有限证据，不默认把整本报告交给大模型。
+Read [Analysis_Protocol.md](references/Analysis_Protocol.md) before multi-round analysis or finalizing evidence-backed conclusions. Read [Financial_Analysis.md](references/Financial_Analysis.md) for cash flow, financing, ETR, management balance sheet, DuPont, ROIC, equity incentives, or cross-document reconciliation.
 
-### 2.2 financial_analysis 策略
-
-1. 优先检索 MD&A、收入分部、收入类别、分部信息、收入成本、销售及营销费用、费用性质、经营利润/亏损和 KPI 驱动页。
-2. 对管理层解释和财务报表金额进行交叉验证。
-3. 除非用户问收入确认或列报政策，否则会计政策证据作为次要证据。
-
-## 3. 建议工作流
+## Divide responsibilities
 
 ```text
-识别市场和任务
--> route_query_tool
--> 结构化数据 provider 或披露文件 provider
--> 必要时下载 PDF
--> 只有用户要求读取、分析、搜索或准备证据时才 ingest PDF
--> get_evidence_packet_tool
--> 只分析证据包
+LLM: interpret intent, define claims and accounting scope, review evidence,
+     explain differences, label inference, and write the answer
+
+Kit: locate and validate filings, ingest and index pages, retrieve evidence,
+     calculate and reconcile, preserve IDs, detect conflicts, and enforce gates
 ```
 
+Use subagents only after the evidence snapshot is stable and claims are independent. Keep evidence IDs, formal calculations, status gating, conflict resolution, and final synthesis with the main agent.
+
+## Diagnose failures
+
+Read [Troubleshooting.md](references/Troubleshooting.md) when tools are unavailable, evidence is empty, OCR is required, the wrong filing is selected, indexes disagree, or calculations fail.
+
+---
+**文档创建时间：** 2026-07-22 18:33
+**最后修改时间：** 2026-07-22 19:14
+**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）

@@ -1,6 +1,6 @@
 # B2 公司数据
 
-相关文档：[README](../README.md) | [A0.文档索引](./A0_DOC_INDEX.md) | [A1.安装使用](./A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](./A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](./A3_WORKFLOW.md) | [A4.MCP函数](./A4_MCP_TOOLS.md) | [B1.PDF Ingest](./B1_PDF_INGEST.md) | [B2.公司数据](./B2_COMPANY_DATA.md) | [B3.HKEX](./B3_HKEX.md) | [B4.招股书](./B4_PROSPECTUS.md) | [C1.测试计划](./C1_TEST_PLAN.md) | [D1.开发计划](./D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../CHANGELOG.md)
+文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
 
 本文说明 A 股和港股结构化公司数据的来源和边界。
 
@@ -69,5 +69,5 @@ PDF 适合回答：
 
 结构化查询结果可写入 SQLite，减少重复请求。
 
-对于港股结构化数据，v1.0 已支持基础调用，但不同接口的缓存、重试和字段标准化仍应在后续版本继续加强。
+当前版本支持港股结构化数据基础调用，并将结果写入SQLite供本地复用。不同AKShare接口的字段、单位和覆盖范围并不完全一致，分析前仍需核对接口名、返回字段和报告口径。
 

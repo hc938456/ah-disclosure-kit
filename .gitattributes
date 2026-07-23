@@ -1,0 +1,14 @@
+* text=auto
+
+*.py text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.csv text eol=lf
+*.ps1 text eol=crlf
+.gitignore text eol=lf
+VERSION text eol=lf
+requirements*.txt text eol=lf

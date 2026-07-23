@@ -1,0 +1,4 @@
+market,symbol,company_name,document_type,report_year,language,hkex_stock_id
+A,600036,招商银行,annual_report,2025,ZH,
+H,06862,海底捞,annual_report,2025,EN,
+H,01519,极兔速递-W,prospectus,2023,EN,

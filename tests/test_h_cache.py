@@ -1,5 +1,3 @@
-import pandas as pd
-
 from ah_disclosure.clients import akshare_h_client
 from ah_disclosure.clients.akshare_h_client import HCompanyClient
 
@@ -10,7 +8,7 @@ def test_h_akshare_result_is_cached(monkeypatch, tmp_path):
 
     def fake_func(**params):
         calls["count"] += 1
-        return pd.DataFrame([{"指标": "收入", "2025": 123}, {"指标": "净利润", "2025": 45}])
+        return [{"指标": "收入", "2025": 123}, {"指标": "净利润", "2025": 45}]
 
     monkeypatch.setattr(akshare_h_client, "get_akshare_function", lambda name: fake_func)
 

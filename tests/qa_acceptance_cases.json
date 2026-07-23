@@ -1,0 +1,457 @@
+[
+  {
+    "case_id": "annual_cfo_biography",
+    "category": "management",
+    "document_ids": ["A_603486_2025_annual_report_ZH_科沃斯"],
+    "question": "科沃斯的CFO是谁？请概括他的教育和主要任职经历。",
+    "claims": [
+      {
+        "claim_id": "cfo_identity_bio",
+        "question": "财务负责人或首席财务官的姓名、教育背景和任职经历",
+        "queries": ["财务负责人 首席财务官 简历", "CFO 教育 任职经历"],
+        "expected_groups": [["马建军"], ["首席财务官", "财务负责人"], ["瑞士信贷", "瑞信证券"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_revenue_amount",
+    "category": "financial_fact",
+    "document_ids": ["A_002179_2025_annual_report_ZH_中航光电"],
+    "question": "中航光电2025年营业收入是多少，同比如何？",
+    "claims": [
+      {
+        "claim_id": "revenue_amount_growth",
+        "question": "2025年营业收入金额、2024年比较数和同比变动",
+        "queries": ["营业收入 2025 2024 同比", "主要会计数据 营业收入"],
+        "expected_groups": [["营业收入"], ["2025"], ["2024", "上年"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_revenue_policy",
+    "category": "accounting_policy",
+    "document_ids": ["A_603486_2025_annual_report_ZH_科沃斯"],
+    "question": "科沃斯不同销售渠道的收入在什么时候确认？",
+    "claims": [
+      {
+        "claim_id": "channel_recognition",
+        "question": "线上、线下、经销或直销等销售模式的收入确认时点",
+        "queries": ["收入确认 线上 线下 经销 直销", "控制权转移 商品销售 收入确认"],
+        "expected_groups": [["收入确认", "确认收入"], ["控制权", "客户取得"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_rd_policy",
+    "category": "accounting_judgment",
+    "document_ids": ["A_688521_2025_annual_report_ZH_芯原股份"],
+    "question": "芯原股份研发支出何时费用化、何时资本化？这对利润有什么含义？",
+    "claims": [
+      {
+        "claim_id": "rd_capitalisation",
+        "question": "研究阶段和开发阶段支出的费用化、资本化条件",
+        "queries": ["研发支出 研究阶段 开发阶段 资本化", "内部研究开发项目 无形资产 确认条件"],
+        "expected_groups": [["研究阶段"], ["开发阶段"], ["资本化", "无形资产"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_segment_mix",
+    "category": "segment_analysis",
+    "document_ids": ["H_02319_2025_annual_report_EN_MENGNIU_DAIRY"],
+    "question": "蒙牛2025年收入由哪些产品分部构成，哪个分部变化最大？",
+    "claims": [
+      {
+        "claim_id": "segment_revenue",
+        "question": "2025及2024年各产品分部收入及变动",
+        "queries": ["segment revenue liquid milk ice cream milk formula cheese 2025 2024", "revenue by product segment"],
+        "expected_groups": [["liquid milk"], ["ice cream"], ["milk formula", "milk powder"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_customer_concentration",
+    "category": "risk_analysis",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "药明生物是否存在客户集中风险？前五大客户贡献多少收入？",
+    "claims": [
+      {
+        "claim_id": "customer_concentration",
+        "question": "最大客户和前五大客户的收入占比",
+        "queries": ["largest customer five largest customers percentage revenue", "customer concentration revenue"],
+        "expected_groups": [["five largest customers", "top five customers"], ["revenue"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_financing_actual_cash",
+    "category": "cashflow_reconciliation",
+    "document_ids": ["H_02319_2025_annual_report_EN_MENGNIU_DAIRY"],
+    "question": "蒙牛2025年实际拿到多少债务融资、偿还多少本金，并支付了多少融资利息？",
+    "claims": [
+      {
+        "claim_id": "debt_proceeds_repayments",
+        "question": "借款、票据和债券的现金流入及本金偿还现金流出",
+        "queries": ["proceeds from borrowings repayment borrowings bonds cash flow financing activities", "short term notes bank loans proceeds repayments"],
+        "expected_groups": [["proceeds", "borrowings"], ["repayment", "repaid"]]
+      },
+      {
+        "claim_id": "financing_interest_paid",
+        "question": "融资活动或现金流量表披露的已付利息",
+        "queries": ["interest paid financing activities cash flow", "interest paid"],
+        "expected_groups": [["interest paid", "interest"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_indirect_cfo_tieout",
+    "category": "cashflow_reconciliation",
+    "document_ids": ["A_601919_2025_annual_report_ZH_中远海控"],
+    "question": "用间接法把中远海控2025年净利润勾稽到经营活动现金流净额，并指出最大调整项。",
+    "claims": [
+      {
+        "claim_id": "indirect_cfo_bridge",
+        "question": "净利润调节为经营活动现金流量的完整调整表",
+        "queries": ["将净利润调节为经营活动现金流量", "净利润 经营活动现金流量 折旧 存货 经营性应收"],
+        "expected_groups": [["净利润"], ["经营活动产生的现金流量净额"], ["折旧", "摊销"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_ah_crosscheck",
+    "category": "cross_document",
+    "document_ids": ["A_601919_2025_annual_report_ZH_中远海控", "H_01919_2025_annual_report_EN_COSCO_SHIP_HOLD"],
+    "question": "中远海控A股与H股年报披露的2025年收入和经营现金流是否一致？",
+    "claims": [
+      {
+        "claim_id": "a_h_revenue",
+        "question": "A股和H股版本中的2025年收入",
+        "queries": ["营业收入 2025", "revenue 2025"],
+        "expected_groups": [["营业收入", "revenue"]]
+      },
+      {
+        "claim_id": "a_h_cfo",
+        "question": "A股和H股版本中的2025年经营活动现金流净额",
+        "queries": ["经营活动产生的现金流量净额 2025", "net cash flows from operating activities 2025"],
+        "expected_groups": [["经营活动", "operating activities"]]
+      }
+    ],
+    "require_all_documents": true
+  },
+  {
+    "case_id": "annual_multi_revenue_model",
+    "category": "accounting_policy",
+    "document_ids": ["H_00881_2025_annual_report_EN_ZHONGSHENG_HLDG"],
+    "question": "中升控股卖车、售后和代理服务分别怎么确认收入？是总额法还是净额法？",
+    "claims": [
+      {
+        "claim_id": "revenue_streams",
+        "question": "汽车销售、售后服务及佣金代理服务的收入确认模式和总额净额判断",
+        "queries": ["revenue recognition sale motor vehicles after-sales services commission agency principal agent", "revenue from contracts with customers motor vehicles after-sales"],
+        "expected_groups": [["motor vehicles"], ["after-sales", "after sales"], ["revenue"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_key_audit_matter",
+    "category": "audit",
+    "document_ids": ["A_002179_2025_annual_report_ZH_中航光电"],
+    "question": "审计师把哪些事项列为关键审计事项，为什么？",
+    "claims": [
+      {
+        "claim_id": "key_audit_matters",
+        "question": "关键审计事项、形成原因和审计应对",
+        "queries": ["关键审计事项 为什么 审计应对", "关键审计事项 收入 应收账款"],
+        "expected_groups": [["关键审计事项"], ["审计应对"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_share_options",
+    "category": "equity_compensation",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "药明生物期权或受限制股份的期初、授予、行权、失效、期末数量能否勾稽？股份支付费用是多少？",
+    "claims": [
+      {
+        "claim_id": "award_rollforward",
+        "question": "股份奖励或期权的期初、授予、行权、失效和期末数量",
+        "queries": ["share options outstanding beginning granted exercised lapsed ending", "restricted shares awards movement"],
+        "expected_groups": [["granted"], ["exercised", "vested"], ["lapsed", "forfeited", "cancelled"]]
+      },
+      {
+        "claim_id": "share_payment_expense",
+        "question": "2025年股份支付费用",
+        "queries": ["share-based payment expense 2025", "equity-settled share-based payment expense"],
+        "expected_groups": [["share-based payment", "share based payment"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_pre_revenue",
+    "category": "ipo_financial_history",
+    "document_ids": ["A_688192_2021_prospectus_ZH_迪哲医药"],
+    "question": "迪哲医药上市前有没有商业化收入？亏损主要由什么驱动？",
+    "claims": [
+      {
+        "claim_id": "revenue_loss_history",
+        "question": "报告期营业收入、净利润和研发费用及亏损原因",
+        "queries": ["尚未实现商业化销售 营业收入 亏损 研发费用", "报告期 营业收入 净利润 研发投入"],
+        "expected_groups": [["尚未", "未实现", "无营业收入"], ["研发"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_use_of_proceeds",
+    "category": "ipo_funding",
+    "document_ids": ["A_688192_2021_prospectus_ZH_迪哲医药"],
+    "question": "迪哲医药计划募集多少钱，分别投向什么项目？",
+    "claims": [
+      {
+        "claim_id": "fundraising_uses",
+        "question": "募集资金总额、净额或拟投入金额及募投项目",
+        "queries": ["募集资金 投资项目 拟投入 金额", "募集资金用途 研发中心 新药研发"],
+        "expected_groups": [["募集资金"], ["项目"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_pipeline_risk",
+    "category": "ipo_risk",
+    "document_ids": ["A_688192_2021_prospectus_ZH_迪哲医药"],
+    "question": "迪哲医药核心候选药失败会怎样影响持续经营？有哪些关键临床风险？",
+    "claims": [
+      {
+        "claim_id": "clinical_pipeline_risk",
+        "question": "核心候选药临床失败、审批和商业化风险",
+        "queries": ["核心候选药 临床试验失败 风险 商业化", "新药研发 审批 不确定性 持续经营"],
+        "expected_groups": [["临床试验", "临床研究"], ["风险"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_control_structure",
+    "category": "ipo_governance",
+    "document_ids": ["A_689009_2020_prospectus_ZH_九号公司"],
+    "question": "九号公司为什么采用CDR和特殊控制架构？投资者承担哪些治理风险？",
+    "claims": [
+      {
+        "claim_id": "cdr_control_risk",
+        "question": "CDR、红筹或特殊投票权控制安排及投资者风险",
+        "queries": ["存托凭证 CDR 特别投票权 控制权 风险", "红筹架构 实际控制人 投资者保护"],
+        "expected_groups": [["存托凭证", "CDR"], ["控制权", "投票权"], ["风险"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_revenue_policy",
+    "category": "accounting_policy",
+    "document_ids": ["A_689009_2020_prospectus_ZH_九号公司"],
+    "question": "九号公司的智能硬件、电商和经销业务分别在何时确认收入？",
+    "claims": [
+      {
+        "claim_id": "hardware_channel_recognition",
+        "question": "不同硬件销售和渠道模式的收入确认时点",
+        "queries": ["收入确认 经销 电商 智能硬件 控制权", "销售商品 收入确认 时点"],
+        "expected_groups": [["收入确认", "确认收入"], ["控制权", "风险和报酬"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_mobility_model",
+    "category": "business_model",
+    "document_ids": ["H_09680_2024_prospectus_EN_CHENQI_TECH"],
+    "question": "如祺出行如何赚钱？平台服务、Robotaxi和车辆销售分别扮演什么角色？",
+    "claims": [
+      {
+        "claim_id": "mobility_revenue_model",
+        "question": "mobility services、technology services、fleet sale和Robotaxi的商业模式与收入来源",
+        "queries": ["business model revenue mobility services technology services Robotaxi fleet sale", "revenue streams ride-hailing platform services"],
+        "expected_groups": [["mobility services"], ["Robotaxi"], ["revenue"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_unit_economics",
+    "category": "business_analysis",
+    "document_ids": ["H_09680_2024_prospectus_EN_CHENQI_TECH"],
+    "question": "如祺出行订单增长是否带来更好的单位经济性？请比较GTV、收入、毛利和补贴。",
+    "claims": [
+      {
+        "claim_id": "unit_economics",
+        "question": "GTV、收入、毛利率、司机或用户补贴的历史变化",
+        "queries": ["GTV revenue gross profit margin incentives subsidies drivers consumers", "gross transaction value unit economics"],
+        "expected_groups": [["GTV", "gross transaction value"], ["revenue"], ["gross profit", "gross margin"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_cash_runway",
+    "category": "liquidity_analysis",
+    "document_ids": ["H_09680_2024_prospectus_EN_CHENQI_TECH"],
+    "question": "如祺出行上市前的现金消耗速度如何，现有现金能否覆盖未来十二个月？",
+    "claims": [
+      {
+        "claim_id": "cash_burn_liquidity",
+        "question": "经营现金流、现金余额、流动性和营运资金充足性",
+        "queries": ["net cash used in operating activities cash and cash equivalents working capital sufficient 12 months", "liquidity cash burn"],
+        "expected_groups": [["operating activities"], ["cash"], ["working capital", "12 months"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_qunabox_model",
+    "category": "business_model",
+    "document_ids": ["H_00917_2024_prospectus_EN_QUNABOX"],
+    "question": "趣致集团的机器售货和互动营销业务如何形成收入？",
+    "claims": [
+      {
+        "claim_id": "qunabox_revenue_model",
+        "question": "interactive marketing services和merchandise sales通过机器产生收入的方式",
+        "queries": ["business model interactive marketing services merchandise sales vending machine revenue", "revenue model machine marketing campaign"],
+        "expected_groups": [["interactive marketing"], ["merchandise sales", "merchandise"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_qunabox_recognition",
+    "category": "accounting_policy",
+    "document_ids": ["H_00917_2024_prospectus_EN_QUNABOX"],
+    "question": "趣致集团互动营销服务和商品销售分别何时确认收入？",
+    "claims": [
+      {
+        "claim_id": "qunabox_recognition",
+        "question": "互动营销服务和商品销售的履约义务及收入确认时点",
+        "queries": ["revenue recognition performance obligation interactive marketing services merchandise sales", "recognised at a point in time over time"],
+        "expected_groups": [["performance obligation", "revenue recognition"], ["interactive marketing"], ["merchandise"]]
+      }
+    ]
+  },
+  {
+    "case_id": "prospectus_customer_risk",
+    "category": "risk_analysis",
+    "document_ids": ["H_00917_2024_prospectus_EN_QUNABOX"],
+    "question": "趣致集团是否依赖少数大客户？客户集中度和回款风险如何？",
+    "claims": [
+      {
+        "claim_id": "customer_credit_risk",
+        "question": "最大客户、前五大客户收入占比及贸易应收款信用风险",
+        "queries": ["largest customer five largest customers percentage revenue trade receivables credit risk", "customer concentration"],
+        "expected_groups": [["five largest customers", "top five customers"], ["trade receivables", "credit risk"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_related_parties",
+    "category": "governance",
+    "document_ids": ["H_00881_2025_annual_report_EN_ZHONGSHENG_HLDG"],
+    "question": "中升控股有哪些重大关联方交易，是否可能影响利润或现金流判断？",
+    "claims": [
+      {
+        "claim_id": "related_party_transactions",
+        "question": "关联方交易类别、金额、余额和定价条款",
+        "queries": ["material related party transactions balances terms", "related parties purchases sales loans"],
+        "expected_groups": [["related party", "related parties"], ["transaction", "balance"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_effective_tax_rate_bridge",
+    "category": "management_tax_analysis",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "药明生物2025年的实际税率是多少？请从25%法定税率逐项调节到所得税费用，并核对管理层披露的21.6%。",
+    "claims": [
+      {
+        "claim_id": "etr_reconciliation",
+        "question": "税前利润、25%法定税额、各税率调节项和最终所得税费用",
+        "queries": ["income tax expense reconciliation profit before tax EIT rate 25% non deductible concessionary rates", "unused tax losses super deduction different tax rate income tax expense"],
+        "expected_groups": [["profit before tax"], ["tax charge at the eit rate"], ["non-deductible", "not deductible"], ["income tax expense"]]
+      },
+      {
+        "claim_id": "mda_effective_rate",
+        "question": "管理层讨论中披露的2025年effective tax rate",
+        "queries": ["effective tax rate 21.6% 2025 2024", "income tax expense effective tax rate"],
+        "expected_groups": [["effective tax rate"], ["21.6%", "21.6"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_dupont_transformation",
+    "category": "management_reporting",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "把药明生物2025年财务报表转换成三因素杜邦分析，使用平均资产和平均权益。",
+    "claims": [
+      {
+        "claim_id": "dupont_profit_revenue",
+        "question": "2025年收入和本年利润",
+        "queries": ["revenue profit for the year 2025 2024 consolidated statement profit loss"],
+        "expected_groups": [["revenue"], ["profit for the year"]]
+      },
+      {
+        "claim_id": "dupont_assets_equity",
+        "question": "2025和2024年总资产与总权益，用于计算平均余额",
+        "queries": ["consolidated statement financial position total assets total equity 2025 2024", "net assets total equity non controlling interests"],
+        "expected_groups": [["total equity"], ["2025"], ["2024"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_operating_working_capital",
+    "category": "management_reporting",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "把药明生物资产负债表转换为经营性working capital，并与现金流量表的营运资本变动勾稽。",
+    "claims": [
+      {
+        "claim_id": "operating_nwc_balance",
+        "question": "存货、经营性应收、合同资产和成本、经营性应付、合同负债及准备",
+        "queries": ["inventories trade other receivables contract assets contract costs trade other payables contract liabilities provisions 2025 2024", "current assets current liabilities"],
+        "expected_groups": [["inventories"], ["contract assets"], ["trade and other payables"], ["contract liabilities"]]
+      },
+      {
+        "claim_id": "cashflow_working_capital",
+        "question": "现金流量表中各项working capital变动",
+        "queries": ["operating cash flows before movements in working capital inventories receivables payables contract liabilities", "cash generated from operations working capital"],
+        "expected_groups": [["working capital"], ["trade and other receivables"], ["trade and other payables"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_ppe_and_capex_bridge",
+    "category": "management_reporting",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "重构药明生物固定资产滚动表，并解释会计新增额与现金capex为何不同。",
+    "claims": [
+      {
+        "claim_id": "ppe_rollforward",
+        "question": "固定资产成本、累计折旧、处置、汇兑和期末账面价值滚动",
+        "queries": ["property plant equipment cost additions disposals depreciation exchange alignment carrying values 2025", "PPE construction in progress rollforward"],
+        "expected_groups": [["additions"], ["depreciation"], ["carrying values"]]
+      },
+      {
+        "claim_id": "cash_capex",
+        "question": "现金流量表中的固定资产购买现金支出",
+        "queries": ["purchases of property plant and equipment investing activities 2025", "capital expenditure cash flow"],
+        "expected_groups": [["purchases of property, plant and equipment", "purchases of property plant and equipment"]]
+      }
+    ]
+  },
+  {
+    "case_id": "annual_provisional_roic",
+    "category": "management_reporting",
+    "document_ids": ["H_02269_2025_annual_report_EN_WUXI_BIO"],
+    "question": "将药明生物财务报表转换成ROIC分析；区分报告数字、分析假设和无法直接取得的经营调整。",
+    "claims": [
+      {
+        "claim_id": "nopat_inputs",
+        "question": "税前利润、融资成本、所得税费用及实际税率，用于形成provisional NOPAT",
+        "queries": ["profit before tax financing costs income tax expense 2025", "interest expense bank borrowings lease liabilities"],
+        "expected_groups": [["profit before tax"], ["financing costs"], ["income tax expense"]]
+      },
+      {
+        "claim_id": "invested_capital_inputs",
+        "question": "权益、借款、租赁负债、现金和定期存款，用于分析投入资本",
+        "queries": ["total equity borrowings lease liabilities bank balances cash time deposits 2025 2024", "gearing ratio interest bearing borrowings total equity"],
+        "expected_groups": [["total equity"], ["borrowings"], ["bank balances and cash", "cash"]]
+      }
+    ]
+  }
+]

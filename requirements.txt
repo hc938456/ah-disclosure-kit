@@ -1,12 +1,2 @@
-akshare>=1.16.0
-pandas>=2.0.0
-requests>=2.31.0
-httpx>=0.27.0
-beautifulsoup4>=4.12.0
-lxml>=5.0.0
-mcp>=1.7.0
-openpyxl>=3.1.0
-pymupdf>=1.24.0
-pymupdf4llm>=0.0.17
-pypdf>=4.0.0
-pdfplumber>=0.11.0
+# Compatibility entry point. pyproject.toml is the dependency source of truth.
+-e .[pdf,company-data,mcp]

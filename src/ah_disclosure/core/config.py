@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ class Settings:
     akshare_ttl_days: int = 7
     cninfo_ttl_days: int = 1
     hkex_ttl_days: int = 1
+    historical_filing_ttl_days: int = 30
     resolver_ttl_days: int = 90
     default_ingest_mode: str = "auto"
     generate_markdown: bool = False
@@ -36,11 +38,36 @@ def _package_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _source_checkout_root() -> Path | None:
+    root = _package_root()
+    if (root / "pyproject.toml").is_file() and (root / "src" / "ah_disclosure").is_dir():
+        return root
+    return None
+
+
+def _user_data_root() -> Path:
+    if os.name == "nt":
+        base = Path(os.getenv("LOCALAPPDATA") or os.getenv("APPDATA") or Path.home())
+        return base / "ah-disclosure"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "ah-disclosure"
+    base = Path(os.getenv("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+    return base / "ah-disclosure"
+
+
 def _project_root() -> Path:
-    package_root = _package_root()
-    if package_root.parent.name.lower() == "tools":
-        return package_root.parent.parent
-    return package_root
+    checkout_root = _source_checkout_root()
+    if checkout_root is None:
+        return _user_data_root()
+    if checkout_root.parent.name.lower() == "tools":
+        return checkout_root.parent.parent
+    return checkout_root
+
+
+def _default_data_dir() -> Path:
+    if _source_checkout_root() is None:
+        return _user_data_root() / "data"
+    return _project_root() / "data" / "ah_disclosure"
 
 
 def _coerce_bool(value: Any, default: bool = False) -> bool:
@@ -52,7 +79,11 @@ def _coerce_bool(value: Any, default: bool = False) -> bool:
 
 
 def _read_config_file() -> dict[str, Any]:
-    configured = os.getenv("AH_DISCLOSURE_CONFIG") or os.getenv("AH_FILINGS_CONFIG", "config.toml")
+    configured = (
+        os.getenv("AH_DISCLOSURE_CONFIG")
+        or os.getenv("AH_FILINGS_CONFIG")
+        or "config.toml"
+    )
     path = Path(configured).expanduser()
     if not path.is_absolute():
         path = _project_root() / path
@@ -74,8 +105,18 @@ def get_settings() -> Settings:
     logging = config.get("logging", {}) if isinstance(config, dict) else {}
     llm = config.get("llm", {}) if isinstance(config, dict) else {}
 
-    data_dir_value = os.getenv("AH_DISCLOSURE_DATA_DIR") or os.getenv("AH_FILINGS_DATA_DIR") or paths.get("data_dir")
-    data_dir = Path(data_dir_value).expanduser().resolve() if data_dir_value else (_project_root() / "data" / "ah_disclosure").resolve()
+    data_dir_value = (
+        os.getenv("AH_DISCLOSURE_DATA_DIR")
+        or os.getenv("AH_FILINGS_DATA_DIR")
+        or paths.get("data_dir")
+    )
+    if data_dir_value:
+        configured_data_dir = Path(str(data_dir_value)).expanduser()
+        if not configured_data_dir.is_absolute():
+            configured_data_dir = _project_root() / configured_data_dir
+        data_dir = configured_data_dir.resolve()
+    else:
+        data_dir = _default_data_dir().resolve()
 
     return Settings(
         data_dir=data_dir,
@@ -84,6 +125,7 @@ def get_settings() -> Settings:
         akshare_ttl_days=int(cache.get("akshare_ttl_days", cache.get("ttl_days", 7))),
         cninfo_ttl_days=int(cache.get("cninfo_ttl_days", 1)),
         hkex_ttl_days=int(cache.get("hkex_ttl_days", 1)),
+        historical_filing_ttl_days=int(cache.get("historical_filing_ttl_days", 30)),
         resolver_ttl_days=int(cache.get("resolver_ttl_days", 90)),
         default_ingest_mode=str(pdf.get("default_ingest_mode", "auto")),
         generate_markdown=_coerce_bool(pdf.get("generate_markdown", False), False),

@@ -1,6 +1,6 @@
 # B4 招股书与上市文件
 
-相关文档：[README](../README.md) | [A0.文档索引](./A0_DOC_INDEX.md) | [A1.安装使用](./A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](./A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](./A3_WORKFLOW.md) | [A4.MCP函数](./A4_MCP_TOOLS.md) | [B1.PDF Ingest](./B1_PDF_INGEST.md) | [B2.公司数据](./B2_COMPANY_DATA.md) | [B3.HKEX](./B3_HKEX.md) | [B4.招股书](./B4_PROSPECTUS.md) | [C1.测试计划](./C1_TEST_PLAN.md) | [D1.开发计划](./D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../CHANGELOG.md)
+文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
 
 本文说明招股书、上市文件、聆讯资料和募集说明书的查询路径。
 
@@ -39,14 +39,25 @@ IPO 招股书在哪里？
 - 查询通常需要港股代码或 HKEX `stockId`。
 - 不建议只凭公司名称跑全市场扫描。
 - 结果应返回来源 URL、本地 PDF 路径、发布日期和文件标题。
+- HKEX可能对发行公告和正式招股书使用相同的`GLOBAL OFFERING`标题，不能只按标题选择。
+- 应读取HKEX的文件类别和文件大小；`Listing Documents - [Offer for Subscription]`优先于`Announcements and Notices - [Formal Notice]`。
+- 正式招股书应通过页数及核心章节校验，包括招股章程/全球发售、风险因素、业务、财务资料和会计师报告。
+- 查询繁体中文港股招股书时优先使用“全球發售”，再回退至“招股章程”“上市文件”和英文关键词；中文上市文件类别中的“上市文件 - [發售以供認購]”优先级高于“公告及通告 - [正式通告]”。
+- 繁体中文招股书分析应同时使用“收入確認”“重大會計政策”“分部資料”“收入分拆”“主要產品及服務”等检索词，避免正确下载后因简繁差异返回空证据包。
+- 正文还应匹配目标公司或股票代码及预期年度，避免结构完整但属于其他发行人的文件进入正式缓存。
+- 短篇发行公告应标记为`rejected_short_document`并继续检查下一个候选。
 
 ## 4. 下载和解析
+
+A股募集说明书会按可转债、公司债、增发、配股和其他融资分类查询。只要任一分类返回正式文件，结果仅保留文件候选；如果所有分类都因来源异常失败，则返回带来源、分类和错误类型的结构化错误，不能把上游超时解释为“没有文件”。
 
 只要求下载时：
 
 ```text
 download_prospectus_tool
--> 保存 PDF
+-> 下载到暂存区
+-> 校验结构和文档身份
+-> 通过后保存到 raw/
 -> 返回路径和 URL
 ```
 
@@ -54,8 +65,9 @@ download_prospectus_tool
 
 ```text
 download_and_ingest_prospectus_tool
--> 下载 PDF
--> ingest
+-> 暂存并校验 PDF
+-> 通过后移动到 raw/
+-> 复用校验时抽取的页面执行 ingest
 -> SQLite FTS
 -> EvidencePacket
 -> 大模型分析

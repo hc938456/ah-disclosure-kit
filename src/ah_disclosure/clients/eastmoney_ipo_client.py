@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from typing import Any
 
@@ -7,6 +8,7 @@ import requests
 
 from ah_disclosure.core.cache import read_cache, write_cache
 from ah_disclosure.core.config import get_settings
+from ah_disclosure.identity.bse_symbol_resolver import canonicalize_bse_symbol
 from ah_disclosure.models import ProspectusRecord
 from ah_disclosure.providers.akshare_registry import IPO_INTERFACES, get_akshare_function
 from ah_disclosure.providers.dataframe_utils import dataframe_to_records
@@ -33,6 +35,71 @@ def _row_value(row: dict[str, Any], *keys: str) -> Any:
 
 class EastmoneyIpoClient:
     source = "Eastmoney via AKShare"
+
+    def search_bse_listed_prospectus(
+        self,
+        symbol: str,
+        company_name: str,
+        max_rows: int = 20,
+    ) -> list[ProspectusRecord]:
+        """Search historical BSE prospectuses through Eastmoney announcements."""
+        normalized = str(symbol).strip()
+        current_code = str(canonicalize_bse_symbol(normalized)["symbol"])
+        url = "https://np-anotice-stock.eastmoney.com/api/security/ann"
+        records: list[ProspectusRecord] = []
+        # The endpoint occasionally returns an empty first page without total_hits.
+        # Start with the safety cap and narrow it only after a non-zero total arrives.
+        page_count = 15
+        for page_index in range(1, 16):
+            if page_index > page_count:
+                break
+            response = requests.get(
+                url,
+                params={
+                    "sr": "-1",
+                    "page_size": "100",
+                    "page_index": str(page_index),
+                    "ann_type": "A",
+                    "client_source": "web",
+                    "stock_list": current_code,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+            response.encoding = "utf-8"
+            data = response.json().get("data") or {}
+            total_hits = int(data.get("total_hits") or 0)
+            if total_hits:
+                page_count = max(math.ceil(total_hits / 100), 1)
+            for row in data.get("list") or []:
+                title = str(row.get("title_ch") or row.get("title") or "")
+                if "招股说明书" not in title or "摘要" in title:
+                    continue
+                art_code = str(row.get("art_code") or "")
+                if not art_code:
+                    continue
+                records.append(
+                    ProspectusRecord(
+                        market="A",
+                        symbol=normalized,
+                        company_name=company_name,
+                        board="北交所",
+                        document_type="招股说明书",
+                        title=title,
+                        publish_date=_none(row.get("notice_date")),
+                        source="Eastmoney announcements",
+                        source_url=(
+                            "https://xinsanban.eastmoney.com/Article/NoticeContent"
+                            f"?id={art_code}"
+                        ),
+                        pdf_url=f"https://pdf.dfcfw.com/pdf/H2_{art_code}_1.pdf",
+                    )
+                )
+                if len(records) >= max_rows:
+                    return records
+            if records:
+                return records
+        return records
 
     def _fetch_rows_for_company(self, company_keyword: str) -> list[dict[str, Any]]:
         func_name = "stock_register_all_em"
@@ -92,6 +159,7 @@ class EastmoneyIpoClient:
         board: str = "all",
         status_keyword: str = "",
         max_rows: int = 20,
+        symbol: str | None = None,
     ) -> list[ProspectusRecord]:
         func_name = IPO_INTERFACES.get(board, board)
         try:
@@ -119,6 +187,7 @@ class EastmoneyIpoClient:
                 ProspectusRecord(
                     market="A",
                     company_name=_none(_row_value(row, "企业名称", "DECLARE_ORG")) or "",
+                    symbol=symbol,
                     board=_none(_row_value(row, "拟上市地点", "PREDICT_LISTING_MARKET")),
                     stage=_none(_row_value(row, "最新状态", "STATE")),
                     document_type="招股说明书",

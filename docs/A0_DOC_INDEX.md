@@ -1,6 +1,6 @@
 # A0 文档索引
 
-相关文档：[README](../README.md) | [A0.文档索引](./A0_DOC_INDEX.md) | [A1.安装使用](./A1_INSTALLATION_AND_USAGE.md) | [A2.本地更新](./A2_UPDATE_LOCAL_INSTALL.md) | [A3.工作流](./A3_WORKFLOW.md) | [A4.MCP函数](./A4_MCP_TOOLS.md) | [B1.PDF Ingest](./B1_PDF_INGEST.md) | [B2.公司数据](./B2_COMPANY_DATA.md) | [B3.HKEX](./B3_HKEX.md) | [B4.招股书](./B4_PROSPECTUS.md) | [C1.测试计划](./C1_TEST_PLAN.md) | [D1.开发计划](./D1_DEVELOPMENT_PLAN_V1_0.md) | [命令示例](../examples/A0_CLAUDE_CODE_COMMANDS.md) | [更新日志](../CHANGELOG.md)
+文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
 
 本文是 `ah-disclosure-kit` 的中文文档入口，便于快速定位各类说明文档。
 
@@ -22,9 +22,9 @@
 
 - `C1_TEST_PLAN.md`：本地测试和真实数据测试建议。
 
-## 4. D 类：开发定稿
+## 4. D 类：历史开发记录
 
-- `D1_DEVELOPMENT_PLAN_V1_0.md`：v1.0 设计、边界、目录、数据流和后续规划。
+- `D1_DEVELOPMENT_PLAN_V1_0.md`：已归档的v1.0设计、边界、目录、数据流和当时的后续规划；当前行为以README、A/B/C类文档和CHANGELOG为准。
 
 ## 5. 其他文件
 

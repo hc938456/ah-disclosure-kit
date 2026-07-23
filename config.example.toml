@@ -6,6 +6,7 @@ ttl_days = 7
 akshare_ttl_days = 7
 cninfo_ttl_days = 1
 hkex_ttl_days = 1
+historical_filing_ttl_days = 30
 resolver_ttl_days = 90
 
 [pdf]
