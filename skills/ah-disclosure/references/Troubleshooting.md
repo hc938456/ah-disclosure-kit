@@ -24,6 +24,6 @@
 - Split dense formulas into auditable steps and report unresolved differences instead of forcing a pass.
 
 ---
-**文档创建时间：** 2026-07-22 18:56
-**最后修改时间：** 2026-07-22 18:56
-**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
+**Document created:** 2026-07-22 18:56
+**Last modified:** 2026-07-23 17:02
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)

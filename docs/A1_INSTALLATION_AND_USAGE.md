@@ -1,52 +1,52 @@
-# A1 安装与使用
+# A1 Installation and Usage
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation navigation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明 `ah-disclosure-kit` 的本地安装、MCP 注册和常用命令。
+This guide explains how to install `ah-disclosure-kit` locally, register its MCP server, and use its common commands.
 
-## 1. 环境要求
+## 1. Requirements
 
-建议环境：
+Recommended environment:
 
-- Windows 10/11、macOS 或 Linux。
-- Python 3.11 或更高版本。
-- `python` 命令在 PowerShell / Terminal 中可用。
-- 已安装 Claude Code / Codex。
-- 可访问 A 股、港股披露文件来源网站。
+- Windows 10/11, macOS, or Linux.
+- Python 3.11 or later.
+- The `python` command is available in PowerShell or a terminal.
+- Claude Code or Codex is installed.
+- The machine can access websites that publish A-share and H-share disclosure documents.
 
-仓库CI覆盖Windows/Linux与Python 3.11、3.12、3.13、3.14。macOS可安装使用，但当前不在自动化矩阵内。
+The repository CI covers Windows and Linux with Python 3.11, 3.12, 3.13, and 3.14. macOS installations are supported, but macOS is not currently included in the automated test matrix.
 
-注意：本 kit 不会自动安装 Python 解释器。如果当前机器没有 Python，需要先安装 Python，再执行后续 pip 安装命令。
+Note: This Kit does not install the Python interpreter automatically. If Python is not installed on the machine, install it before running the pip commands below.
 
-## 2. 安装依赖
+## 2. Install Dependencies
 
-### 2.1 一键安装 / 检查
+### 2.1 One-Step Installation and Validation
 
-建议在 kit 根目录执行：
+Run the following commands from the Kit root directory:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\INSTALL_AND_CHECK.ps1
 ```
 
-脚本负责：
+The script:
 
-- 检查已有 Python 是否为 3.11+。
-- 安装/更新 Python 包依赖，默认安装 `.[pdf,company-data,mcp]`。
-- 创建默认数据目录。
-- 替换同名目标，并复制 Skill 到用户级 `.agents\skills\ah-disclosure`。
-- 如果当前环境存在 `claude` 命令，则注册 MCP server。
-- 验证 `ah-disclosure-kit` 版本和 CLI 基础命令。
+- Verifies that the installed Python version is 3.11 or later.
+- Installs or updates Python package dependencies; the default extras are `.[pdf,company-data,mcp]`.
+- Creates the default data directory.
+- Replaces any existing destination with the same name and copies the Skill to the user-level `.agents\skills\ah-disclosure` directory.
+- Registers the MCP server when the `claude` command is available in the current environment.
+- Validates the `ah-disclosure-kit` version and basic CLI commands.
 
-脚本不负责：
+The script does not:
 
-- 不安装 Python 解释器。
-- 不安装 Tesseract OCR。
-- 不创建项目 `.venv`。
+- Install the Python interpreter.
+- Install Tesseract OCR.
+- Create a project `.venv`.
 
-脚本会升级当前`python`对应环境中的`pip`，并使用editable模式安装Kit。为了与其他Python工具隔离，可以在执行脚本前创建并启用`.venv`；如果不启用虚拟环境，脚本会修改当前`python`指向的环境。
+The script upgrades `pip` in the environment associated with the current `python` command and installs the Kit in editable mode. To isolate it from other Python tools, create and activate a `.venv` before running the script. If no virtual environment is active, the script modifies the environment referenced by the current `python` command.
 
-常用参数：
+Common options:
 
 ```powershell
 .\scripts\INSTALL_AND_CHECK.ps1 -SkipMcpRegistration
@@ -54,9 +54,9 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\INSTALL_AND_CHECK.ps1 -Extras "pdf,company-data,mcp,table,ocr"
 ```
 
-### 2.2 手工安装
+### 2.2 Manual Installation
 
-在 kit 根目录执行：
+Run the following commands from the Kit root directory:
 
 ```powershell
 cd C:\path\to\ah-disclosure-kit
@@ -64,44 +64,44 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[pdf,company-data,mcp]"
 ```
 
-如果需要开发、OCR、表格抽取和向量相关可选能力：
+To install development, OCR, table extraction, and vector-related optional features:
 
 ```powershell
 python -m pip install -e ".[all]"
 ```
 
-安装到哪个Python环境由使用者决定。用于长期运行MCP时，建议使用固定的独立`.venv`以减少与其他工具的依赖冲突；如选择全局或用户级Python，应先确认升级`pip`和安装依赖不会影响现有项目。
+The user determines which Python environment receives the installation. For a long-running MCP server, use a dedicated, persistent `.venv` to reduce dependency conflicts with other tools. If you choose a global or user-level Python environment, first confirm that upgrading `pip` and installing dependencies will not affect existing projects.
 
-默认一键安装及上述常规手工安装包含PDF解析、AKShare公司数据和MCP运行依赖。仅需来源查询和下载时，可使用`python -m pip install -e .`安装轻量核心；其他能力可按需选择`pdf`、`company-data`、`mcp`、`layout`、`table`、`ocr`、`vector`和`dev`。`layout`用于按版面生成增强Markdown，默认ingest不需要。Python的`ocr`依赖不会安装系统级Tesseract OCR，使用OCR仍需另行安装Tesseract。
+The default one-step installation and the standard manual installation above include PDF parsing, AKShare company data, and MCP runtime dependencies. If you only need source discovery and downloads, use `python -m pip install -e .` to install the lightweight core. Other capabilities are available through the `pdf`, `company-data`, `mcp`, `layout`, `table`, `ocr`, `vector`, and `dev` extras. The `layout` extra generates enhanced Markdown based on page layout and is not required for standard ingest. The Python `ocr` dependencies do not install the system-level Tesseract OCR application; install Tesseract separately before using OCR.
 
-## 3. 数据目录
+## 3. Data Directory
 
-源码checkout或editable安装时，默认数据目录固定按项目工作区解析，不随当前运行目录变化：
+For a source checkout or editable installation, the default data directory is resolved from the project workspace and does not depend on the current working directory:
 
 ```text
 data/ah_disclosure
 ```
 
-当仓库位于某个工作区的`tools/ah-disclosure-kit`时，实际默认位置为该工作区的`data/ah_disclosure`；其他源码布局默认使用仓库内的`data/ah_disclosure`。
+When the repository is located at `tools/ah-disclosure-kit` inside a workspace, the actual default location is `data/ah_disclosure` under that workspace. For other source layouts, the default is `data/ah_disclosure` inside the repository.
 
-wheel安装时默认使用操作系统用户数据目录：Windows为`%LOCALAPPDATA%\ah-disclosure\data`，macOS为`~/Library/Application Support/ah-disclosure/data`，Linux为`${XDG_DATA_HOME:-~/.local/share}/ah-disclosure/data`。
+For a wheel installation, the default is the operating system's user data directory: `%LOCALAPPDATA%\ah-disclosure\data` on Windows, `~/Library/Application Support/ah-disclosure/data` on macOS, and `${XDG_DATA_HOME:-~/.local/share}/ah-disclosure/data` on Linux.
 
-建议显式设置：
+Setting the location explicitly is recommended:
 
 ```powershell
 $env:AH_DISCLOSURE_DATA_DIR="C:\path\to\data\ah_disclosure"
 ```
 
-数据目录用于保存：
+The data directory stores:
 
-- 原始 PDF：`raw/`
-- PDF 解析结果：`parsed/`
-- SQLite 检索库：`index/ah_disclosure.sqlite`
-- 缓存：`cache/`
+- Original PDFs: `raw/`
+- PDF parsing results: `parsed/`
+- SQLite search database: `index/ah_disclosure.sqlite`
+- Cache: `cache/`
 
-## 4. 注册 MCP
+## 4. Register the MCP Server
 
-Codex在`%USERPROFILE%\.codex\config.toml`中使用以下配置：
+Codex uses the following configuration in `%USERPROFILE%\.codex\config.toml`:
 
 ```toml
 [mcp_servers.ah_disclosure]
@@ -110,111 +110,105 @@ args = ["-m", "ah_disclosure.mcp_server"]
 startup_timeout_sec = 120
 ```
 
-其中`command`应使用安装Kit时的Python绝对路径，可通过`python -c "import sys; print(sys.executable)"`查询。重启Codex后运行`codex mcp list`，并在支持命令菜单的界面通过`/mcp`确认`ah_disclosure`已连接。
+Set `command` to the absolute path of the Python interpreter used to install the Kit. Retrieve it with `python -c "import sys; print(sys.executable)"`. After restarting Codex, run `codex mcp list` and use `/mcp` in interfaces that support command menus to confirm that `ah_disclosure` is connected.
 
-Claude Code可使用：
+For Claude Code, use:
 
 ```powershell
 claude mcp add --transport stdio --scope user ah-disclosure "python -m ah_disclosure.mcp_server"
 ```
 
-注册完成后，在 Claude Code 中运行：
+After registration, run the following command in Claude Code:
 
 ```text
 /mcp
 ```
 
-确认 `ah-disclosure` 在线。
+Confirm that `ah-disclosure` is online.
 
-## 5. 安装 Skill
+## 5. Install the Skill
 
-将整个规范 Skill 目录复制：
+Copy the entire canonical Skill directory:
 
 ```text
 skills/ah-disclosure
 ```
 
-到用户级目录：
+to the user-level directory:
 
 ```text
-C:\Users\<用户名>\.agents\skills\ah-disclosure
+C:\Users\<username>\.agents\skills\ah-disclosure
 ```
 
-示例路径：
+You can instead copy it to `.agents\skills\ah-disclosure` under a project root to make it available only to that project. Do not copy only `SKILL.md`; the `agents/` and `references/` directories are also part of the Skill.
 
-```text
-C:\Users\<用户名>\.agents\skills\ah-disclosure
-```
-
-也可以复制到项目根目录的 `.agents\skills\ah-disclosure`，仅对该项目生效。不要只复制 `SKILL.md`；`agents/` 和 `references/` 也是 Skill 的组成部分。
-
-也可以让安装脚本直接同步到项目级 Skill 根目录：
+The installation script can also synchronize the Skill directly to a project-level Skill root:
 
 ```powershell
-.\scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot "C:\目标项目\.agents\skills"
+.\scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot "C:\target-project\.agents\skills"
 ```
 
-重启Codex后，在Skills页面或支持`/skills`的界面确认`ah-disclosure`已被发现；也可以在新任务中显式使用`$ah-disclosure`进行验证。
+After restarting Codex, confirm on the Skills page or in an interface that supports `/skills` that `ah-disclosure` has been discovered. You can also verify it explicitly in a new task by invoking `$ah-disclosure`.
 
-## 6. 常用 CLI 命令
+## 6. Common CLI Commands
 
-查看服务信息：
+Display server information:
 
 ```powershell
 ah-disclosure server-info
 ```
 
-查询 A 股公司资料：
+Query an A-share company profile:
 
 ```powershell
 ah-disclosure a profile --symbol 600519
 ```
 
-查询 A 股财务报表：
+Query A-share financial statements:
 
 ```powershell
 ah-disclosure a financials --symbol 600519 --statement all
 ```
 
-下载 A 股年报但不解析：
+Download an A-share annual report without ingesting it:
 
 ```powershell
 ah-disclosure a report --symbol 600519 --year 2024 --download
 ```
 
-下载并解析 A 股年报：
+Download and ingest an A-share annual report:
 
 ```powershell
 ah-disclosure a report --symbol 600519 --year 2024 --download --ingest
 ```
 
-查询港股公司资料：
+Query an H-share company profile:
 
 ```powershell
 ah-disclosure h profile --symbol 00700
 ```
 
-下载港股年报但不解析：
+Download an H-share annual report without ingesting it:
 
 ```powershell
 ah-disclosure h report --symbol 00700 --download
 ```
 
-下载并解析港股年报：
+Download and ingest an H-share annual report:
 
 ```powershell
 ah-disclosure h report --symbol 00700 --download --ingest
 ```
 
-港股`hkex_stock_id`通常由工具自动解析并永久缓存。只有需要指定候选映射或排查身份解析时，才传入`--hkex-stock-id`或使用`resolve --refresh-identity`重新核对。
+The tool normally resolves and permanently caches the H-share `hkex_stock_id` automatically. Pass `--hkex-stock-id` only when you need to specify a candidate mapping or troubleshoot identity resolution, or use `resolve --refresh-identity` to verify the mapping again.
 
-检索本地已解析 PDF：
+Search locally ingested PDFs:
 
 ```powershell
 ah-disclosure local search --query "revenue recognition"
 ```
 
-批量下载、校验并解析年报或招股书：
+Batch-download, validate, and ingest annual reports or prospectuses:
 
 ```powershell
 ah-disclosure batch prepare `
@@ -223,54 +217,53 @@ ah-disclosure batch prepare `
   --summary-only
 ```
 
-输入支持UTF-8 CSV、JSON和JSONL。必填字段为`market`和`symbol`，可选字段为`company_name`、`document_type`、`report_year`、`language`和`hkex_stock_id`。`document_type`支持`annual_report`和`prospectus`。
+Inputs may be UTF-8 CSV, JSON, or JSONL files. The required fields are `market` and `symbol`. Optional fields are `company_name`, `document_type`, `report_year`, `language`, and `hkex_stock_id`. Supported `document_type` values are `annual_report` and `prospectus`.
 
-常用批量参数：
+Common batch options:
 
-- `--max-workers 2`：默认并发2，硬上限4。
-- `--resume`：从输出文件对应的checkpoint继续。
-- `--offline`：只使用本地PDF、来源缓存和索引。
-- `--refresh-source`：重新核对官方文件来源。
-- `--refresh-identity`：重新核对HKEX `stockId`永久映射。
-- `--stop-on-error`：首个失败后停止，并自动按单线程执行。
-- `--ocr auto|off|force`：控制批量ingest的OCR策略，默认`auto`。
-- `--quiet-progress`：不在stderr输出逐项进度。
-- `--summary-only`：完整结果仍写入`--output`文件，终端只显示总体统计和每项状态。
+- `--max-workers 2`: Uses two concurrent workers by default, with a hard limit of four.
+- `--resume`: Resumes from the checkpoint associated with the output file.
+- `--offline`: Uses only local PDFs, source caches, and indexes.
+- `--refresh-source`: Checks the official document source again.
+- `--refresh-identity`: Revalidates the permanent HKEX `stockId` mapping.
+- `--stop-on-error`: Stops after the first failure and automatically switches to single-threaded execution.
+- `--ocr auto|off|force`: Controls the OCR policy for batch ingest; the default is `auto`.
+- `--quiet-progress`: Suppresses per-item progress messages on stderr.
+- `--summary-only`: Still writes complete results to the `--output` file, but displays only aggregate statistics and per-item status in the terminal.
 
-批量命令不会提取EvidencePacket，不执行分析、估值或写作；后续需要分析时再使用本地证据检索流程。完全重复的输入只执行一次，其余行复用结果；输出中的`effective_workers`是实际线程数而非请求上限。
+The batch command does not extract an EvidencePacket or perform analysis, valuation, or writing. Use the local evidence retrieval workflow later when analysis is required. Exact duplicate inputs are processed once, and all duplicate rows reuse that result. The `effective_workers` field in the output reports the actual thread count rather than the requested limit.
 
-年报输入省略`report_year`时，结果会在该字段回填实际选中的最新报告年度。
+When `report_year` is omitted for an annual report, the result populates that field with the year of the latest report selected.
 
-## 7. 常用提问方式
+## 7. Common Prompt Patterns
 
-只下载 PDF：
-
-```text
-使用 ah-disclosure 下载美团 2025 年年报，只下载 PDF，不要解析。
-```
-
-下载并分析：
+Download a PDF only:
 
 ```text
-使用 ah-disclosure 下载美团 2025 年年报，并分析收入、净利润和分部利润。
+Use ah-disclosure to download Meituan's 2025 annual report. Download the PDF only and do not ingest it.
 ```
 
-检索已下载资料：
+Download and analyze:
 
 ```text
-使用 ah-disclosure 在本地已解析的腾讯 2024 年报中，查找收入类别和收入确认政策。
+Use ah-disclosure to download Meituan's 2025 annual report and analyze its revenue, net profit, and segment profit.
 ```
 
-## 8. 默认行为提醒
+Search previously downloaded materials:
 
-只说“下载 PDF”时，工具不会默认抽文本、不会写 SQLite、不会生成 `pages.jsonl`。
+```text
+Use ah-disclosure to search the locally ingested Tencent 2024 annual report for revenue categories and revenue recognition policies.
+```
 
-只有当用户要求分析、阅读、检索、摘要或准备证据时，才会执行 ingest。
+## 8. Default Behavior
+
+When a user asks only to "download the PDF," the tool does not extract text, write to SQLite, or generate `pages.jsonl` by default.
+
+Ingest runs only when the user asks to analyze, read, search, summarize, or prepare evidence.
 
 ---
-**文档创建时间：** 2026-07-03 15:44
+**Document created:** 2026-07-03 15:44
 
-**最后修改时间：** 2026-07-23 14:52
+**Last modified:** 2026-07-23 17:36
 
-**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
-
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)

@@ -1,7 +1,7 @@
 interface:
-  display_name: "A/H 披露分析"
-  short_description: "查询A/H股公司数据，并下载、解析、检索和勾稽分析披露文件"
-  default_prompt: "使用 $ah-disclosure 查询A/H股公司数据，或下载、解析并分析指定公司的年报或招股书，返回可追溯证据和经过验证的计算。"
+  display_name: "A/H Disclosure Analysis"
+  short_description: "Retrieve A/H company data and analyze disclosure filings"
+  default_prompt: "Use $ah-disclosure to retrieve A/H company data or download, ingest, and analyze a specified annual report or prospectus with traceable evidence and verified calculations."
 
 dependencies:
   tools:

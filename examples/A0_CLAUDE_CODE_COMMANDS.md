@@ -1,72 +1,77 @@
-# A0 Claude Code 命令示例
+# A0 Claude Code Command Examples
 
-文档导航：[A0 文档索引](../docs/A0_DOC_INDEX.md)
+Documentation: [A0 Documentation Index](../docs/A0_DOC_INDEX.md)
 
-## 1. 注册 MCP
+## 1. Register the MCP server
 
 ```powershell
 claude mcp add --transport stdio --scope user ah-disclosure "python -m ah_disclosure.mcp_server"
 ```
 
-## 2. 常用提示词
+## 2. Common prompts
 
-只下载 PDF：
-
-```text
-使用 ah-disclosure 下载腾讯 2024 年年报，只下载 PDF，不要解析。
-```
-
-下载并分析：
+Download a PDF without ingesting it:
 
 ```text
-使用 ah-disclosure 下载美团 2025 年年报和 2026 Q1 业绩公告，并分析收入、净利润、分部表现和管理层解释。
+Use ah-disclosure to download Tencent's 2024 annual report. Download the PDF only; do not ingest it.
 ```
 
-整理重要会计政策：
+Download and analyze:
 
 ```text
-使用 ah-disclosure 下载并分析腾讯 2024 年年报，整理收入确认、成本确认、金融资产减值、研发费用资本化、所得税和合并报表范围等重要会计政策，并按“政策内容 + 对财务分析的影响”输出。
+Use ah-disclosure to download Meituan's 2025 annual report and Q1 2026 results announcement. Analyze revenue, net profit, segment performance, and management's explanations.
 ```
 
-分析股权激励：
+Summarize significant accounting policies:
 
 ```text
-使用 ah-disclosure 下载并分析美团最近一期年报，整理公司的股权激励情况，包括股权激励计划类型、授予对象、授予数量、行权价格、归属安排、当期股份支付费用及其对利润的影响。
+Use ah-disclosure to download and analyze Tencent's 2024 annual report. Summarize significant accounting policies for revenue recognition, cost recognition, impairment of financial assets, capitalization of research and development expenditure, income taxes, and the scope of consolidation. Present each item as "policy content + impact on financial analysis."
 ```
 
-分析招股书中的 IPO 前融资：
+Analyze share-based compensation:
 
 ```text
-使用 ah-disclosure 下载并分析公司的招股书，整理 IPO 前融资历史，包括各轮融资时间、投资方、融资金额、主要入股价格、优先股或特殊权利安排，以及上市前主要机构投资者情况。
+Use ah-disclosure to download and analyze Meituan's latest annual report. Summarize its share-based compensation arrangements, including plan types, eligible recipients, number of awards granted, exercise prices, vesting schedules, share-based payment expense for the period, and the effect on profit.
 ```
 
-分析招股书中的主要投资方：
+Analyze pre-IPO financing in a prospectus:
 
 ```text
-使用 ah-disclosure 下载并分析公司的招股书，整理上市前主要股东和机构投资者，说明持股比例、进入时间、是否为核心战略投资者，以及这些投资方对公司治理和后续退出节奏的潜在影响。
+Use ah-disclosure to download and analyze the company's prospectus. Summarize its pre-IPO financing history, including the date of each round, investors, amount raised, principal entry prices, preference-share or special-rights arrangements, and major institutional investors before listing.
 ```
 
-查询结构化数据：
+Analyze major investors disclosed in a prospectus:
 
 ```text
-使用 ah-disclosure 直接查结构化数据，不用查 PDF。告诉我腾讯 2025 年收入和净利润。
+Use ah-disclosure to download and analyze the company's prospectus. Summarize the major pre-listing shareholders and institutional investors, including their ownership percentages, investment dates, whether they are core strategic investors, and their potential influence on corporate governance and the timing of future exits.
 ```
 
-检索本地 PDF：
+Query structured data:
 
 ```text
-使用 ah-disclosure 在本地已解析的美团年报中查找 revenue recognition、customer incentives 和 selling and marketing expenses 相关页。
+Use ah-disclosure to query structured data directly without searching PDFs. Tell me Tencent's revenue and net profit for 2025.
 ```
 
-要求证据：
+Search locally ingested PDFs:
 
 ```text
-使用 ah-disclosure 返回 EvidencePacket，并基于证据页回答。请列出来源文件、页码和本地 PDF 路径。
+Use ah-disclosure to find pages related to revenue recognition, customer incentives, and selling and marketing expenses in the locally ingested Meituan annual report.
 ```
 
-批量准备但暂不分析：
+Require evidence:
 
 ```text
-使用 ah-disclosure batch prepare，按我提供的公司名单批量完成代码确认、来源定位、下载、校验和ingest；不要提取EvidencePacket，不要分析、估值或写作。完成后汇总每条任务状态和各阶段耗时。
+Use ah-disclosure to return an EvidencePacket and answer from the evidence pages. List the source file, page numbers, and local PDF path.
 ```
+
+Prepare a batch without analyzing it:
+
+```text
+Use ah-disclosure batch prepare to process the company list I provide. Confirm stock codes, locate sources, download, validate, and ingest the documents in batch. Do not extract an EvidencePacket and do not perform analysis, valuation, or report writing. When complete, summarize each task's status and the elapsed time for every stage.
+```
+
+---
+**Document created:** 2026-07-03 19:31
+**Last modified:** 2026-07-23 16:53
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
 

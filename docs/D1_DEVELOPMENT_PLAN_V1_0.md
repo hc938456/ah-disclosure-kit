@@ -1,174 +1,186 @@
-# D1 开发计划 v1.0
+# D1 Development Plan v1.0
 
-> 归档说明：本文保留v1.0定稿时的设计、测试数量和后续设想，仅用于追溯历史。v1.1.0及后续实际行为以README、A/B/C类文档和CHANGELOG为准。
+> Archive note: This document preserves the finalized v1.0 design, test counts, and follow-up ideas for historical traceability only. For the actual behavior of v1.1.0 and later versions, refer to the README, the A/B/C documentation series, and the CHANGELOG.
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation navigation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-文件版本：v1.0  
-开发定稿时间：2026-07-03 15:44  
-项目名：`ah-disclosure-kit`  
-Python 包名：`ah_disclosure`  
-MCP server 名：`ah-disclosure`  
-Skill 名：`ah-disclosure`  
-CLI 命令：`ah-disclosure`
+File version: v1.0
 
-## 1. 项目定位
+Development finalized: 2026-07-03 15:44
 
-`ah-disclosure-kit` 是面向 A 股和港股的非交易类公司数据与披露文件工作台。
+Project name: `ah-disclosure-kit`
 
-核心目标：
+Python package name: `ah_disclosure`
 
-- 查询 A/H 股公司资料和结构化财务数据。
-- 查询并下载 A 股、港股原始披露 PDF。
-- 查询并下载招股书、上市文件、募集说明书。
-- 对 PDF 做本地解析和检索。
-- 为大模型提供可追溯、低 token 的 EvidencePacket。
+MCP server name: `ah-disclosure`
 
-明确不做：
+Skill name: `ah-disclosure`
 
-- 实时行情。
-- K 线和分时。
-- 盘口。
-- 技术指标。
-- 短线情绪。
-- 交易建议。
+CLI command: `ah-disclosure`
 
-## 2. 数据源设计
+## 1. Project Scope
 
-| 场景 | 首选来源 | 说明 |
+`ah-disclosure-kit` is a non-trading workspace for A-share and H-share company data and disclosure documents.
+
+Primary objectives:
+
+- Retrieve A/H-share company profiles and structured financial data.
+- Find and download original A-share and H-share disclosure PDFs.
+- Find and download prospectuses, listing documents, and offering circulars.
+- Parse and search PDFs locally.
+- Provide LLMs with traceable, token-efficient EvidencePackets.
+
+Explicitly out of scope:
+
+- Real-time market quotes.
+- Candlestick and intraday charts.
+- Order books.
+- Technical indicators.
+- Short-term market sentiment.
+- Trading recommendations.
+
+## 2. Data Source Design
+
+| Use case | Preferred source | Description |
 |---|---|---|
-| A 股结构化公司数据 | AKShare | 公司资料、财务报表、财务指标、分红、股东等 |
-| 港股结构化公司数据 | AKShare | 公司资料、财务报表、指标、分红等 |
-| A 股原始公告 PDF | CNINFO | 年报、中报、季报、普通公告 |
-| 港股原始公告 PDF | HKEXnews | 年报、中报、通函、业绩公告 |
-| A 股 IPO / 招股书索引 | AKShare / 东方财富 | IPO 阶段信息、保荐机构等 |
-| A 股历史招股书 / 募集说明书 | CNINFO | 已上市公司历史文件 |
-| 港股招股书 / 上市文件 | HKEXnews | 需要港股代码或 HKEX stockId |
+| Structured A-share company data | AKShare | Company profiles, financial statements, financial indicators, dividends, shareholders, and related data |
+| Structured H-share company data | AKShare | Company profiles, financial statements, indicators, dividends, and related data |
+| Original A-share announcement PDFs | CNINFO | Annual reports, interim reports, quarterly reports, and general announcements |
+| Original H-share announcement PDFs | HKEXnews | Annual reports, interim reports, circulars, and results announcements |
+| A-share IPO/prospectus index | AKShare / Eastmoney | IPO-stage information, sponsors, and related data |
+| Historical A-share prospectuses/offering circulars | CNINFO | Historical documents for listed companies |
+| H-share prospectuses/listing documents | HKEXnews | Requires an H-share stock code or HKEX stockId |
 
-## 3. PDF 默认处理策略
+## 3. Default PDF Processing Strategy
 
-只下载 PDF 时，不解析。
+Downloading a PDF alone does not trigger parsing.
 
-用户要求分析、读取、搜索、摘要或证据时，才执行 ingest。
+Ingest runs only when the user requests analysis, reading, search, summarization, or evidence.
 
-默认 ingest 只生成：
+By default, ingest generates only:
 
 - `meta.json`
 - `pages.jsonl`
 - `quality_report.json`
 - SQLite FTS
 
-默认不生成：
+By default, ingest does not generate:
 
 - `document.md`
 - `full_text.txt`
-- 向量索引
-- 全量 OCR
+- Vector indexes
+- Full-document OCR
 
-## 4. 本地问答链路
+## 4. Local Question-Answering Workflow
 
 ```text
-用户问题
--> 判断市场、公司、文件类型和任务类型
--> 使用结构化数据或披露文件路径
--> 如需 PDF 证据，先确认本地是否已有解析结果
--> SQLite FTS 检索关键词和同义词
--> 中文/普通子串兜底
--> 读取相关页和相邻页
--> 组装 EvidencePacket
--> 大模型只基于证据包回答
+User question
+-> Determine the market, company, document type, and task type
+-> Use either structured data or the disclosure-document path
+-> If PDF evidence is required, first check for existing local parsed artifacts
+-> Search SQLite FTS with keywords and synonyms
+-> Fall back to Chinese/general substring search
+-> Read relevant pages and adjacent pages
+-> Assemble an EvidencePacket
+-> Have the LLM answer only from the evidence packet
 ```
 
-## 5. 命名规则
+## 5. Naming Convention
 
-PDF、解析目录和 `document_id` 尽量使用稳定命名：
+PDFs, parsed directories, and `document_id` values should use stable names whenever possible:
 
 ```text
 MARKET_SYMBOL_YEAR_DOCUMENTTYPE_LANGUAGE_SHORTNAME
 ```
 
-示例：
+Examples:
 
 ```text
-A_600519_2024_annual_report_ZH_贵州茅台.pdf
+A_600519_2024_annual_report_ZH_KWEICHOW_MOUTAI.pdf
 H_00700_2024_annual_report_EN_TENCENT.pdf
 H_03690_2026_q1_results_announcement_EN_MEITUAN-W.pdf
 ```
 
-## 6. 数据目录
+## 6. Data Directory
 
-默认数据根目录：
+Default data root:
 
 ```text
 data/ah_disclosure
 ```
 
-建议正式使用时通过环境变量固定：
+For production use, set a fixed location through the following environment variable:
 
 ```text
 AH_DISCLOSURE_DATA_DIR
 ```
 
-目录结构：
+Directory structure:
 
 ```text
-raw/       原始 PDF
-parsed/    PDF 解析产物
-index/     SQLite 检索库
-cache/     接口缓存
-logs/      日志
+raw/       Original PDFs
+parsed/    PDF parsing artifacts
+index/     SQLite search database
+cache/     API cache
+logs/      Logs
 ```
 
-## 7. 清理规则
+## 7. Cleanup Rules
 
-不要手动删除单个 PDF 或解析目录后忽略 SQLite。
+Do not manually delete an individual PDF or parsed directory without updating SQLite.
 
-应使用：
+Use:
 
 - `cleanup_document_tool`
 - `cleanup_company_tool`
 - `reconcile_local_index_tool`
 
-这样可以保证 `raw/`、`parsed/` 和 SQLite FTS 一致。
+These tools keep `raw/`, `parsed/`, and SQLite FTS consistent.
 
-## 8. 已知边界
+## 8. Known Limitations
 
-- 不支持完整结构化的“全年港股新增 IPO 公司列表”。
-- 港股招股书查询以公司代码为范围，不做全市场慢扫描。
-- 港股结构化数据的部分接口仍需要继续增强缓存、重试和字段标准化。
-- OCR 已作为本地能力保留，但默认不全量触发。
-- 向量化 embedding 默认未启用。
+- A complete structured list of all new H-share IPO companies for a full year is not supported.
+- H-share prospectus searches are scoped by company code and do not perform slow market-wide scans.
+- Some H-share structured-data interfaces still require stronger caching, retries, and field normalization.
+- OCR remains available as a local capability but is not triggered across entire documents by default.
+- Vector embeddings are disabled by default.
 
-## 9. v1.0 验收状态
+## 9. v1.0 Acceptance Status
 
-已完成：
+Completed:
 
-- Python 包和 CLI。
-- MCP server。
-- Skill。
-- A/H 股结构化数据路径。
-- CNINFO A 股披露文件路径。
-- HKEXnews 港股披露文件路径。
-- 招股书和发行文件路径。
-- PDF 下载、解析、SQLite FTS。
-- 中文检索子串兜底。
-- 清理和索引一致性工具。
-- 中文文档体系。
+- Python package and CLI.
+- MCP server.
+- Skill.
+- Structured A/H-share data paths.
+- CNINFO A-share disclosure-document path.
+- HKEXnews H-share disclosure-document path.
+- Prospectus and offering-document paths.
+- PDF downloading, parsing, and SQLite FTS.
+- Chinese-search substring fallback.
+- Cleanup and index-consistency tools.
+- Chinese documentation suite.
 
-最后单元测试结果：
+Final unit-test result:
 
 ```text
 44 passed
 ```
 
-## 10. 后续建议
+## 10. Follow-up Recommendations
 
-以下是v1.0定稿时提出的历史建议，其中部分已在v1.1.0完成：
+The following historical recommendations were proposed when v1.0 was finalized; some were completed in v1.1.0:
 
-- 港股结构化数据缓存和重试进一步增强。
-- 表格抽取质量评估。
-- 可选本地 embedding 补充召回。
-- Windows 一键安装脚本。
-- Docker 分发环境。
-- 更完整的真实数据回归测试集。
+- Further strengthen caching and retries for H-share structured data.
+- Add table-extraction quality assessment.
+- Add optional local embeddings to improve recall.
+- Provide a one-click Windows installation script.
+- Provide a Docker distribution environment.
+- Expand the real-data regression test suite.
 
+---
+**Document created:** 2026-07-03 19:31
+
+**Last modified:** 2026-07-23 17:36
+
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)

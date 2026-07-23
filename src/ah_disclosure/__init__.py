@@ -4,7 +4,7 @@ try:
     from importlib.metadata import version
     __version__ = version("ah-disclosure-kit")
 except Exception:
-    __version__ = "1.1.1"
+    __version__ = "1.1.2"
 
 from .models import (
     CompanyDataResult,

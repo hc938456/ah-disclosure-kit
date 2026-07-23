@@ -1,75 +1,80 @@
 # B3 HKEX
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明港股披露文件查询为什么需要 HKEX `stockId`，以及当前工具的边界。
+This document explains why H-share filing searches require an HKEX `stockId` and defines the current scope of the toolkit.
 
-## 1. 港股代码和 HKEX stockId
+## 1. H-share codes and HKEX stockId
 
-HKEXnews 的很多公告查询 URL 使用内部 `stockId`。
+Many HKEXnews announcement-search URLs use an internal `stockId`.
 
-HKEX标题筛选接口不能无条件视为完整候选集。例如以`Annual Report`筛选时，可能漏掉`Annual Report and Accounts 2025 (with employee share plans)`等标题变体。当前流程会先检查标题、年度、排除词和HKEX文件大小；明确且不小于1MB的标准年报直接进入下载校验，只有结果缺失、过小或不确定时才查询同一公司的全部公告。这样保留特殊标题召回能力，同时避免多数标准年报固定执行两次HKEX请求。
+The HKEX title-filter endpoint cannot be treated unconditionally as a complete candidate set. For example, filtering for `Annual Report` may omit title variants such as `Annual Report and Accounts 2025 (with employee share plans)`. The current workflow first checks the title, reporting year, exclusion terms, and HKEX file size. A clearly identified standard annual report of at least 1 MB proceeds directly to download validation. All announcements for the same company are queried only when the initial result is missing, too small, or uncertain. This preserves recall for unusual titles while avoiding two HKEX requests for most standard annual reports.
 
-同一股票代码、语言和标题关键词的HKEX查询共用一份来源缓存，`max_rows`只控制返回给调用方的本地截取条数。首次远程查询会缓存当前页面的完整候选，因此先查询20条、随后查询10条不会再次访问HKEX。旧版带`max_rows`的缓存会在安全确认未截断时自动迁移。
+HKEX queries with the same stock code, language, and title keyword share one source cache. `max_rows` controls only how many locally cached rows are returned to the caller. The first remote query caches the complete candidate set from the current page, so a request for 20 rows followed by a request for 10 rows does not access HKEX again. Legacy caches keyed by `max_rows` are migrated automatically when the Kit can safely confirm that the result was not truncated.
 
-公开代码到`stockId`采用按需永久缓存，并非一次性下载全部港股映射。同一工作线程复用HKEX HTTP Session；已验证缓存不会在来源查询中重复验证。只有明确设置`refresh=true`才重新核对身份映射，刷新失败保留原记录。
+The mapping from public stock codes to `stockId` values is cached persistently on demand rather than populated by downloading the entire H-share mapping at once. Each worker thread reuses an HKEX HTTP session. Validated cache entries are not revalidated during source searches. Identity mappings are checked again only when `refresh=true` is set explicitly, and the existing record is retained if refresh fails.
 
-`海外監管公告`中可能附带A股年度报告。该文件即使篇幅完整，也不能作为H股年报使用；港股年报流程必须将其标记为错误文档变体，并继续寻找HKEX英文年报对应的繁体中文版。
+An `Overseas Regulatory Announcement` may include an A-share annual report as an attachment. Even if the document is complete, it must not be used as the H-share annual report. The H-share annual-report workflow must classify it as an incorrect document variant and continue searching for the Traditional Chinese version corresponding to the English HKEX annual report.
 
-`stockId` 不是 5 位港股代码。
+`stockId` is not the five-digit H-share code.
 
-例如：
+For example:
 
 ```text
-港股代码：00700
-HKEX stockId：需要通过 HKEX 查询或缓存解析
+H-share code: 00700
+HKEX stockId: must be resolved through an HKEX query or the local cache
 ```
 
-因此港股公告搜索通常需要：
+An H-share announcement search therefore usually follows this sequence:
 
 ```text
-港股代码
+H-share code
 -> resolve_hkex_stock_id
--> 校验 Stock Code / Short Name
+-> validate Stock Code / Short Name
 -> search_h_filings
 -> download
 ```
 
-## 2. 支持的港股披露文件
+## 2. Supported H-share filings
 
-当前支持：
+The current version supports:
 
-- 年报。
-- 中报。
-- 季度业绩公告。
-- 业绩公告。
-- 通函。
-- 普通公告。
-- 招股书。
-- 上市文件。
-- PHIP / 聆讯后资料集。
+- annual reports;
+- interim reports;
+- quarterly results announcements;
+- results announcements;
+- circulars;
+- general announcements;
+- prospectuses;
+- listing documents; and
+- PHIPs / post-hearing information packs.
 
-## 3. 不支持的能力
+## 3. Unsupported capability
 
-当前版本不提供完整结构化的“某一年至今港股新增 IPO 公司列表”。
+The current version does not provide a complete, structured list of newly listed H-share IPO companies for a given year to date.
 
-如果用户问：
-
-```text
-2026 年至今港股新增 IPO 公司 list
-```
-
-应先说明：
+If the user asks:
 
 ```text
-ah-disclosure 当前工具不支持完整结构化的全年港股 IPO 新增列表。
+List all newly listed H-share IPO companies in 2026 year to date.
 ```
 
-如果用户允许，再使用外部网页或交易所页面人工整理，并明确这是外部来源，不是本地 ah-disclosure 结构化结果。
+First explain:
 
-## 4. 招股书查询边界
+```text
+ah-disclosure does not currently support a complete, structured list of all new H-share IPOs for an entire year.
+```
 
-港股招股书 / 上市文件查询是公司代码范围内的查询。
+If the user agrees, compile the list manually from external websites or exchange pages and state clearly that the result comes from external sources rather than local structured ah-disclosure data.
 
-如果用户只给公司中文名或英文名，没有港股代码，应先询问港股代码，不要直接跑全市场扫描。
+## 4. Scope of prospectus searches
+
+H-share prospectus and listing-document searches operate within the scope of a specific company code.
+
+If the user provides only a company name without an H-share code, ask for the code instead of running a market-wide scan.
+
+---
+**Document created:** 2026-07-03 19:31
+**Last modified:** 2026-07-23 16:53
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
 

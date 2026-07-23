@@ -1,6 +1,6 @@
-# ah-disclosure-kit
+# ah-disclosure-kit — A/H-share filing analysis with Python and MCP
 
-**English** | [简体中文](./README.zh-CN.md)
+**English** | [Simplified Chinese](./README.zh-CN.md)
 
 [![CI](https://github.com/hc938456/ah-disclosure-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/hc938456/ah-disclosure-kit/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/hc938456/ah-disclosure-kit)](https://github.com/hc938456/ah-disclosure-kit/releases/latest)
@@ -9,7 +9,7 @@
 
 A local Python and MCP toolkit for A-share and H-share disclosures. It retrieves structured company data, locates and downloads annual reports, announcements, and prospectuses, ingests PDFs into a searchable local index, and supplies traceable evidence and verified calculations for AI-assisted financial analysis.
 
-> Current release: [`v1.1.1`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.1)
+> Current release: [`v1.1.2`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.2)
 >
 > This is not a market-data or trading-decision system. It does not provide real-time quotes, charts, order books, market timing, or investment advice.
 
@@ -50,22 +50,28 @@ Responsibility boundary:
 Download this asset from the [latest release](https://github.com/hc938456/ah-disclosure-kit/releases/latest):
 
 ```text
-ah-disclosure-kit-v1.1.1.zip
+ah-disclosure-kit-v1.1.2.zip
 ```
 
-Extract it to a stable directory, then run in Windows PowerShell:
+Extract it to a stable directory and open Windows PowerShell in the extracted project directory:
+
+```powershell
+Set-Location "C:\path\to\ah-disclosure-kit-v1.1.2"
+```
+
+For isolation from other Python tools, optionally create and activate a dedicated virtual environment before running the installer:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Then run the installer:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 $SkillRoot = Join-Path $env:USERPROFILE ".agents\skills"
 .\scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot $SkillRoot
-```
-
-For isolation from other Python tools, activate a dedicated virtual environment before running the installer:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
 ```
 
 The installer:
@@ -78,7 +84,7 @@ The installer:
 - registers the MCP server when the Claude CLI is available;
 - verifies the package version and `server-info`.
 
-The installer does not install Python, does not install the system-level Tesseract executable, and does not create a `.venv`. If you do not activate a virtual environment first, it modifies the Python environment currently selected by `python`. It uses an editable installation, so keep the extracted source directory in place. If you move it, rerun the installer.
+The installer does not install Python, does not install the system-level Tesseract executable, and does not create a `.venv`. If you skip the optional virtual-environment step, it modifies the Python environment currently selected by `python`. It uses an editable installation, so keep the extracted source directory in place. If you move it, rerun the installer.
 
 The explicit `-SkillInstallRoot` makes the intended Skill scope visible. The installer also uses `%USERPROFILE%\.agents\skills` as its default.
 
@@ -157,7 +163,7 @@ codex mcp list
 Expected version:
 
 ```text
-1.1.1
+1.1.2
 ```
 
 Treat the `data_dir` returned by `server-info` as authoritative. Do not infer it from the shell's current working directory.
@@ -231,7 +237,7 @@ ah-disclosure-kit/
 ├─ src/ah_disclosure/       Python backend and MCP server
 ├─ skills/ah-disclosure/    canonical Skill package
 ├─ scripts/                 installer and acceptance scripts
-├─ docs/                    complete Chinese documentation
+├─ docs/                    complete English documentation
 ├─ examples/                batch input and usage examples
 ├─ tests/                   automated tests
 ├─ pyproject.toml           package metadata and optional dependencies
@@ -241,7 +247,7 @@ ah-disclosure-kit/
 
 ## Documentation
 
-Chinese documentation:
+Documentation:
 
 - [Documentation index](./docs/A0_DOC_INDEX.md)
 - [Installation and usage](./docs/A1_INSTALLATION_AND_USAGE.md)
@@ -280,6 +286,8 @@ The project is available under the [MIT License](./LICENSE). Use of source data 
 
 ## Release
 
-- Latest stable version: [`v1.1.1`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.1)
+- Latest stable version: [`v1.1.2`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.2)
 - Full change history: [CHANGELOG.md](./CHANGELOG.md)
 - Feedback and bug reports: [GitHub Issues](https://github.com/hc938456/ah-disclosure-kit/issues)
+
+If this project is useful, please consider starring the repository.

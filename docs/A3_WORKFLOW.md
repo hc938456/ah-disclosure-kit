@@ -1,170 +1,176 @@
-# A3 工作流
+# A3 Workflow
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation navigation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明用户提问后，`ah-disclosure` 应该按什么顺序工作。
+This guide explains the sequence in which `ah-disclosure` should operate after a user submits a question.
 
-## 1. 总体原则
+## 1. General Principles
 
 ```text
-先判断问题类型
-再选数据路径
-能用结构化数据就先用结构化数据
-查披露来源时先查本地来源缓存
-需要原文证据时再下载或读取 PDF
-大模型只读取相关证据，不默认读取全文
+Classify the question first
+Then select the appropriate data path
+Prefer structured data when it can answer the question
+Check the local source cache before searching for disclosure sources
+Download or read the PDF only when primary-source evidence is required
+Provide the LLM only with relevant evidence rather than the full document by default
 ```
 
-## 2. 问题路由
+## 2. Query Routing
 
 ```mermaid
 flowchart TB
-    Q["用户问题"]
-    R["Query Router<br/>规则优先"]
+    Q["User question"]
+    R["Query Router<br/>Rules first"]
 
     Q --> R
 
-    R -->|公司资料 / 财报 / 分红 / 股东| S["结构化数据路径<br/>AKShare"]
-    R -->|公告 / 年报 / 招股书下载| F["披露文件路径<br/>CNINFO / HKEXnews"]
-    R -->|PDF 内容问答| P["本地文档路径<br/>SQLite FTS / pages.jsonl"]
-    R -->|复杂分析| H["混合路径<br/>结构化数据 + PDF 证据页"]
+    R -->|Company profile / financial statements / dividends / shareholders| S["Structured data path<br/>AKShare"]
+    R -->|Disclosure / annual report / prospectus download| F["Disclosure document path<br/>CNINFO / HKEXnews"]
+    R -->|PDF question answering| P["Local document path<br/>SQLite FTS / pages.jsonl"]
+    R -->|Complex analysis| H["Hybrid path<br/>Structured data + PDF evidence pages"]
 
-    S --> O1["结构化结果<br/>必要时大模型润色"]
-    F --> DL["下载 PDF<br/>返回路径和 URL"]
-    DL -->|用户要求读取 / 分析 / 检索| I["按需 ingest"]
+    S --> O1["Structured result<br/>LLM refinement if needed"]
+    F --> DL["Download PDF<br/>Return path and URL"]
+    DL -->|User requests reading / analysis / search| I["Ingest on demand"]
     P --> E["EvidencePacket"]
     H --> E
     I --> E
-    E --> L["大模型分析相关证据"]
-    L --> O2["输出结论 + 来源 + 页码"]
+    E --> L["LLM analyzes relevant evidence"]
+    L --> O2["Answer + source + page references"]
 ```
 
-## 3. 只下载 PDF 的链路
+## 3. PDF-Only Download Workflow
 
-用户只说“下载年报 / 下载公告 / 下载招股书”时：
+When the user asks only to "download the annual report," "download the announcement," or "download the prospectus":
 
 ```text
-识别公司和市场
--> 查询本地来源缓存
--> 缓存未命中时查询官方公告列表
--> 按标题优先级选择年报候选
--> 下载到 staging/downloads/
--> 年报和招股书按页数、文件大小、中英文关键章节及公司/股票代码/年度校验
--> 校验通过后移动到 raw/
--> 短公告、发布通知或摘要不合格时从暂存区删除并自动尝试下一候选
--> 无法可靠判断的扫描件或身份异常文件移动到 staging/review/，不进入 raw/
--> 返回本地路径和来源 URL
+Identify the company and market
+-> Query the local source cache
+-> Query the official announcement list on a cache miss
+-> Select annual report candidates by title priority
+-> Download to staging/downloads/
+-> Validate annual reports and prospectuses by page count, file size, key English/Chinese sections, company/stock code, and year
+-> Move validated files to raw/
+-> Delete invalid short announcements, publication notices, or summaries from staging and automatically try the next candidate
+-> Move scanned documents or identity anomalies that cannot be assessed reliably to staging/review/ rather than raw/
+-> Return the local path and source URL
 ```
 
-不会默认执行：
+The workflow does not run the following by default:
 
-- PyMuPDF 抽文本
+- PyMuPDF text extraction
 - `pages.jsonl`
 - `quality_report.json`
 - SQLite FTS
 - `document.md`
 - `full_text.txt`
 
-完整性和身份校验只在内存中读取 PDF 元数据和文本，不生成上述持久化解析产物。如果随后需要 ingest，同一次抽取的页面会直接复用，不会为校验和解析重复读取整本 PDF。
+Completeness and identity validation reads PDF metadata and text in memory without generating the persistent parsing artifacts listed above. If ingest is requested afterward, the pages extracted during validation are reused so the entire PDF is not read twice.
 
-## 4. 下载并分析的链路
+## 4. Download-and-Analyze Workflow
 
-用户说“下载并分析”“告诉我里面某项政策”“摘要年报”时：
+When the user asks to "download and analyze," identify a policy in the document, or summarize an annual report:
 
 ```text
 ensure_filing_evidence_tool
--> 根据市场、代码、年份、文档类型和语言自动匹配本地已解析文档
--> 命中时无需显式提供 document_id，跳过来源搜索、下载和完整性扫描
--> 否则查询本地来源缓存
--> 必要时查询官方来源并下载到暂存区
--> PyMuPDF 按页抽文本并完成结构及身份校验
--> 校验通过后移动到正式 raw 目录
--> 必要时 ingest，并复用刚才抽取的页面
--> 生成 meta.json / pages.jsonl / quality_report.json
--> 写入 SQLite FTS
--> 本地检索相关页
--> 组装 EvidencePacket
--> 大模型只读取 EvidencePacket 并回答
+-> Automatically match a locally ingested document by market, symbol, year, document type, and language
+-> If matched, skip source search, download, and completeness scanning without requiring an explicit document_id
+-> Otherwise, query the local source cache
+-> Query the official source and download to staging when necessary
+-> Extract text page by page with PyMuPDF and validate structure and document identity
+-> Move the validated file to the official raw directory
+-> Ingest when necessary and reuse the pages extracted during validation
+-> Generate meta.json / pages.jsonl / quality_report.json
+-> Write to SQLite FTS
+-> Search relevant pages locally
+-> Assemble an EvidencePacket
+-> The LLM answers using only the EvidencePacket
 ```
 
-## 5. 追问时的链路
+## 5. Follow-Up Workflow
 
-如果 PDF 已经下载并解析，后续追问不会重新下载。
+If the PDF has already been downloaded and ingested, follow-up questions do not trigger another download.
 
 ```text
-读取本地 SQLite FTS
--> 搜索关键词和同义词
--> 必要时读取相邻页
--> 必要时跨年报 / 季报 / 会计政策页交叉验证
--> 大模型组织答案
+Read the local SQLite FTS index
+-> Search keywords and synonyms
+-> Read adjacent pages when necessary
+-> Cross-check annual reports / interim reports / accounting policy pages when necessary
+-> The LLM composes the answer
 ```
 
-来源查询支持：
+Source discovery supports:
 
-- `prefer_cache=true`：默认本地优先。
-- `refresh=true`：忽略来源缓存并刷新官方来源。
-- `offline=true`：禁止远程请求，仅使用本地缓存。
+- `prefer_cache=true`: Prefer local data by default.
+- `refresh=true`: Ignore the source cache and refresh from the official source.
+- `offline=true`: Prohibit remote requests and use only the local cache.
 
-年报未指定年度时，按标题中的明确财政年度选择最新版本；公告发布日期仅作为同年度排序依据，不能代替报告年度。`Fiscal Year YYYY Annual Report` 视为精确年报标题。同一最新年度仍有多个同分候选时返回用户确认。
+When no annual report year is specified, select the latest version based on an explicit fiscal year in the title. The announcement date is used only to rank candidates within the same fiscal year and cannot replace the report year. A title in the form `Fiscal Year YYYY Annual Report` is treated as an exact annual report title. If multiple candidates for the latest year still have equal scores, ask the user to choose.
 
-`execution_info` 会分别披露文档缓存、来源缓存、PDF 缓存和 ingest 缓存是否命中，并在 `timings_ms` 中拆分来源查询、下载、完整性校验、ingest、证据检索和总耗时。
+`execution_info` separately reports document-cache, source-cache, PDF-cache, and ingest-cache hits. Its `timings_ms` field breaks down source discovery, download, completeness validation, ingest, evidence retrieval, and total elapsed time.
 
-## 6. 关键词检索策略
+## 6. Keyword Search Strategy
 
-不能只搜一个关键词。对会计政策、年报解释、财务分析问题，应采用多路径检索：
+Do not rely on a single keyword. For accounting policies, annual report explanations, and financial analysis questions, use multiple retrieval paths:
 
-- 用户原话关键词。
-- 中文同义词。
-- 英文财报术语。
-- 固定章节词，例如 `revenue recognition`、`segment information`、`significant accounting policies`。
-- 命中页的前后相邻页。
-- MD&A、会计政策、附注和表格之间的交叉验证。
+- The user's original terminology.
+- Chinese synonyms.
+- English financial reporting terminology.
+- Standard section terms such as `revenue recognition`, `segment information`, and `significant accounting policies`.
+- Pages adjacent to a hit.
+- Cross-checks among MD&A, accounting policies, notes, and tables.
 
-## 7. PDF ingest 流程
+## 7. PDF Ingest Workflow
 
 ```mermaid
 flowchart TB
     A["PDF"]
     B["hash / meta.json"]
-    C["PyMuPDF 按页抽文本"]
+    C["PyMuPDF page-by-page text extraction"]
     D["pages.jsonl"]
     E["quality_report.json"]
     F["SQLite FTS"]
-    G{"是否需要增强处理？"}
-    H["局部 OCR"]
-    I["表格抽取"]
-    J["可选 document.md / full_text.txt"]
+    G{"Is enhanced processing required?"}
+    H["Targeted OCR"]
+    I["Table extraction"]
+    J["Optional document.md / full_text.txt"]
     K["EvidencePacket"]
 
     A --> B --> C --> D --> E --> F --> G
-    G -->|扫描或低文本页| H --> K
-    G -->|需要表格| I --> K
-    G -->|用户要求人工阅读导出| J --> K
-    G -->|不需要| K
+    G -->|Scanned or low-text pages| H --> K
+    G -->|Tables required| I --> K
+    G -->|User requests a human-readable export| J --> K
+    G -->|No| K
 ```
 
-## 8. LLM 分工与编排
+## 8. LLM Responsibilities and Orchestration
 
-- Kit 代码：下载、解析、受限检索、证据 ID 与范围校验、确定性 Decimal 计算及结果门禁。
-- 规划 LLM：理解用户问题，拆分可验证 claims，设置检索表达、依赖关系和计算意图，不直接回答用户。
-- parallel worker / subagent：仅复核分配的单个 claim 及允许的证据 ID，返回一条结构化审阅结果；不得回答用户、扩大文档或证据范围，也不得执行无引用计算。
-- 主编排 LLM：处理跨 claim 的期间、单位、口径和解释冲突，设计证据关联计算，合并每个 claim 的唯一审阅结果；Kit 校验合并结果后，主编排 LLM 才生成最终答案。
+- Kit code: Download, parse, perform bounded retrieval, validate evidence IDs and scope, execute deterministic Decimal calculations, and enforce result gates.
+- Planning LLM: Understand the user's question, decompose it into independently verifiable claims, and define retrieval expressions, dependencies, and calculation intent without answering the user directly.
+- Parallel worker / subagent: Review only one assigned claim using its permitted evidence IDs and return one structured review result. It must not answer the user, expand the document or evidence scope, or perform calculations without citations.
+- Orchestrator LLM: Resolve period, unit, scope, and interpretation conflicts across claims; design evidence-linked calculations; and merge one validated review result per claim. The orchestrator may generate the final answer only after the Kit validates the merged result.
 
-动态分析流程：
+Dynamic analysis workflow:
 
 ```text
-prepare_llm_analysis_tool 返回 responsibility_contract
--> 规划 LLM 生成 analysis_plan
--> claims 可设置 depends_on_claim_ids / review_role / worker_preference
--> execute_llm_analysis_plan_tool 检索证据并返回 provider-neutral orchestration.review_batches
--> 支持 subagent 的宿主按 can_run_in_parallel 并行启动独立 worker
--> 不支持 subagent 的宿主按 review_batches 顺序串行复核
--> 主编排 LLM 合并审阅结果并处理冲突
--> continue_llm_analysis_tool / verify_analysis_calculations_tool 由 Kit 校验
--> 校验通过后主编排 LLM 回答用户
+prepare_llm_analysis_tool returns responsibility_contract
+-> The planning LLM generates analysis_plan
+-> Claims may define depends_on_claim_ids / review_role / worker_preference
+-> execute_llm_analysis_plan_tool retrieves evidence and returns provider-neutral orchestration.review_batches
+-> Hosts that support subagents launch independent workers in parallel for can_run_in_parallel batches
+-> Hosts without subagent support review the review_batches sequentially
+-> The orchestrator LLM merges review results and resolves conflicts
+-> continue_llm_analysis_tool / verify_analysis_calculations_tool validates the result through the Kit
+-> After validation passes, the orchestrator LLM answers the user
 ```
 
-`depends_on_claim_ids` 决定批次先后；`review_role` 描述建议的专业复核角色；`worker_preference` 可为 `auto`、`parallel_worker` 或 `orchestrator`。并行是宿主执行能力，不改变协议，也不放宽证据边界。
+`depends_on_claim_ids` controls batch order; `review_role` describes the recommended specialist review role; and `worker_preference` may be `auto`, `parallel_worker`, or `orchestrator`. Parallel execution is a host capability. It does not change the protocol or relax evidence boundaries.
 
-批量准备使用`ah-disclosure batch prepare`执行相同的确定性链路，只完成身份解析、来源定位、下载、校验和ingest。完全重复任务复用首次结果，解析到同一文件的别名任务串行处理；EvidencePacket、分析、估值和写作在后续按需执行。
+Batch preparation uses `ah-disclosure batch prepare` to run the same deterministic workflow and performs only identity resolution, source discovery, download, validation, and ingest. Exact duplicate tasks reuse the first result, while alias tasks that resolve to the same file are processed sequentially. EvidencePacket retrieval, analysis, valuation, and writing are performed later on demand.
 
+---
+**Document created:** 2026-07-03 19:31
+
+**Last modified:** 2026-07-23 17:36
+
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)

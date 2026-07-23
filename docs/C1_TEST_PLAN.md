@@ -1,186 +1,185 @@
-# C1 测试计划
+# C1 Test Plan
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation navigation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明 `ah-disclosure-kit` 当前版本的自动化、真实来源和发布前测试方式。D1文档中的v1.0测试数量仅用于历史追溯。
+This document describes the automated, live-source, and pre-release testing procedures for the current version of `ah-disclosure-kit`. The v1.0 test counts in the D1 document are retained for historical traceability only.
 
-## 1. 单元测试
+## 1. Unit Tests
 
-在 kit 根目录执行：
+Run from the Kit root directory:
 
 ```powershell
 python -m pytest -q
 ```
 
-当前 v1.1.1 发布候选测试结果：
+Current v1.1.2 release-candidate test result:
 
 ```text
 294 passed
 ```
 
-### 1.1 Ingest 后真实问答验收
+### 1.1 Post-Ingest Live Question-Answering Acceptance
 
-使用已经写入 `pages.jsonl` 和 SQLite 的本地年报、招股书，通过全新 MCP `stdio` 进程执行：
+Use local annual reports and prospectuses already written to `pages.jsonl` and SQLite, and run them through a fresh MCP `stdio` process:
 
 ```powershell
 python scripts\run_qa_acceptance.py
 ```
 
-测试定义位于 `tests/qa_acceptance_cases.json`，覆盖管理层简历、收入金额、收入确认、研发资本化、分部分析、客户集中度、融资实际收付、间接法现金流勾稽、A/H 交叉核对、关键审计事项、股份支付、IPO 募资用途、临床风险、控制架构、商业模式、单位经济性、现金消耗、关联交易、effective tax rate、杜邦分析、经营性 working capital、固定资产滚动、现金 capex 和 provisional ROIC。验收必须同时检查目标语义、目标文档、`analysis_run_id`、继续分析、页面扩展、确定性计算、分析假设标记和异常阻断。
+Test definitions are stored in `tests/qa_acceptance_cases.json`. They cover management biographies, revenue amounts, revenue recognition, R&D capitalization, segment analysis, customer concentration, actual financing receipts and payments, indirect-method cash-flow tie-outs, A/H cross-checks, key audit matters, share-based payments, IPO use of proceeds, clinical risks, control structures, business models, unit economics, cash burn, related-party transactions, effective tax rate, DuPont analysis, operating working capital, fixed-asset roll-forwards, cash capex, and provisional ROIC. Acceptance must also verify target semantics, target documents, `analysis_run_id`, analysis continuation, page expansion, deterministic calculations, explicit analysis-assumption labels, and exception blocking.
 
-2026-07-14 第8轮样本最终实测为 `29/29` 场景通过、`8/8` 协议检查和 `7/7` 管理分析计算检查通过；热索引全套耗时约 `15.19秒`，单场景平均约 `0.43秒`，最慢约 `1.06秒`。测试修复了长自然语言查询已有少量精确 FTS 命中时不再补充部分词项高覆盖页面的问题。修复后保留精确结果，并使用有界 trigram/子串检索补召回，不依赖新增业务关键词。管理分析转换测试还要求所有 `source_type=assumption` 变量通过 `assumption_based` 和 `assumption_variables` 显式返回，不能伪装成财报披露值。
+The final Round 8 live test on 2026-07-14 passed `29/29` scenarios, `8/8` protocol checks, and `7/7` management-analysis calculation checks. The full warm-index run took approximately `15.19 seconds`, averaging about `0.43 seconds` per scenario, with the slowest scenario taking about `1.06 seconds`. The test fixed an issue in which long natural-language queries stopped after finding a small number of exact FTS matches and failed to add high-coverage pages matching partial terms. After the fix, exact results are preserved while bounded trigram/substring search supplements recall without relying on additional business-specific keywords. Management-analysis transformation tests also require every variable with `source_type=assumption` to be returned explicitly through `assumption_based` and `assumption_variables`; assumptions must never be presented as values disclosed in the filing.
 
-## 2. 基础命令测试
+## 2. Basic Command Tests
 
-查看服务信息：
+Display server information:
 
 ```powershell
 python -m ah_disclosure.cli server-info
 ```
 
-解析港股代码：
+Resolve an H-share code:
 
 ```powershell
 python -m ah_disclosure.cli resolve --market H --symbol 00700
 ```
 
-查询 A 股公司资料：
+Retrieve an A-share company profile:
 
 ```powershell
 ah-disclosure a profile --symbol 600519
 ```
 
-## 3. 真实全流程测试
+## 3. Live End-to-End Tests
 
-建议至少测试一只 A 股和一只港股。
+Test at least one A-share company and one H-share company.
 
-A 股测试：
+A-share test:
 
 ```powershell
 ah-disclosure a report --symbol 600519 --year 2024 --download --ingest
-ah-disclosure local search --query "收入确认"
+ah-disclosure local search --query "revenue recognition"
 ```
 
-港股测试：
+H-share test:
 
 ```powershell
 ah-disclosure h report --symbol 00700 --year 2024 --download --ingest
 ah-disclosure local search --query "revenue recognition"
 ```
 
-## 4. 重点验收项
+## 4. Key Acceptance Criteria
 
-- 只下载 PDF 时，不生成 `pages.jsonl`、`document.md`、`full_text.txt`。
-- 下载并分析时，生成 `meta.json`、`pages.jsonl`、`quality_report.json` 和 SQLite FTS。
-- 中文关键词检索在 SQLite FTS 无命中时，可以走子串兜底。
-- 清理文档或公司数据时，文件系统和 SQLite 索引同步更新。
-- Skill 中的规则与 docs 文档一致。
-- 包版本、`VERSION` 文件和更新日志一致。
-- 相同来源查询第二次执行时不访问 CNINFO / HKEXnews。
-- `refresh=true` 强制访问远程来源，`offline=true` 不发生远程请求。
-- PDF hash 变化后不复用旧 `pages.jsonl`。
-- H 股招股书找到直接 PDF 后停止后续关键词查询。
-- 港股年报候选会排除短公告、发布通知和摘要，并校验英文、简体中文和繁体中文关键章节。
-- 港股中文年报年份支持阿拉伯数字及“二零二五”“二〇二五”等中文数字。
-- A 股中文版年报不能优先选择英文版或“港股公告”候选。
-- 年报和招股书候选必须先进入暂存区，结构及身份校验通过后才进入 `raw/`。
-- 校验失败的暂存候选应在 ingest 前删除；无法判断的候选应进入 `staging/review/`。
-- 校验后需要 ingest 时应复用同一次页面抽取，不应重复解析整本 PDF。
-- 港股短代码不得因正文中偶然出现单个数字而误判为股票代码匹配。
-- 缓存审计必须保持只读，并识别重复、未引用、暂存遗留和结构异常文件。
-- 大量控制字符的字体编码异常页必须判为低质量；旧索引零命中时应返回 `requires_ocr`，不得静默解释为没有相关披露。
-- 可读表格中的布局控制字符不得触发OCR；低文本但无扫描图像特征的页面不得触发OCR；图像型扫描页仍应触发OCR；较差OCR结果不得覆盖原生文本。
-- 繁体中文港股招股书应优先以“全球發售”命中正式上市文件，并能使用繁体会计政策、业务分部及收入拆分词返回证据。
-- `prepare_filing`必须确保缓存及冷路径均不调用EvidencePacket，同时保持原`ensure_filing_evidence`默认行为不变。
-- `batch prepare`必须支持CSV、JSON和JSONL，保持输入顺序、并发上限、checkpoint续跑和逐项失败隔离；不得调用EvidencePacket或分析流程。
-- `batch prepare --summary-only --output ...`必须把完整结果写入文件，同时让终端输出省略完整校验载荷。
-- 轻量核心wheel安装后必须能运行版本、帮助和服务信息命令，且不得在启动CLI时隐式导入AKShare或MCP；相应功能安装可选依赖后仍需可用。
-- GitHub Actions必须在main、PR和`v*`版本tag上执行Windows/Linux多版本测试，并构建sdist和wheel；工作流只授予只读仓库权限。
-- 省略年报年度时必须按标题财政年度选择最新版本，并识别 `Fiscal Year YYYY Annual Report`；同一最新年度同分时仍应返回歧义。
-- CLI 在 `PYTHONIOENCODING=cp936` 环境下必须仍可输出中文、项目符号和弯引号，并以 UTF-8 字节写入 stdout。
-- 多线程并发ingest大文件时不得出现SQLite写入锁冲突，所有文档页数和FTS索引必须完整。
-- 美式年报使用`Notes to Consolidated Financial Statements`时应通过完整性校验，同时仍要求审计报告、资产负债表和损益表等核心章节。
-- 中文多关键词问题未形成连续短语时，子串兜底应按关键词覆盖度返回收入金额表，不能被重复出现产品名的采购或成本页面挤掉。
+- Downloading only the PDF must not generate `pages.jsonl`, `document.md`, or `full_text.txt`.
+- Downloading and analyzing must generate `meta.json`, `pages.jsonl`, `quality_report.json`, and SQLite FTS.
+- When SQLite FTS returns no matches for Chinese keywords, substring fallback must remain available.
+- Cleaning a document or company dataset must update both the filesystem and SQLite indexes.
+- Rules in the Skill must remain consistent with the documentation under `docs`.
+- The package version, `VERSION` file, and changelog must agree.
+- A repeated query for the same source must not access CNINFO or HKEXnews on the second run.
+- `refresh=true` must force access to the remote source, while `offline=true` must prevent all remote requests.
+- An old `pages.jsonl` must not be reused after the PDF hash changes.
+- After finding a direct PDF for an H-share prospectus, the process must stop issuing further keyword queries.
+- H-share annual-report candidate selection must exclude short announcements, publication notices, and summaries, and validate key sections in English, Simplified Chinese, and Traditional Chinese.
+- H-share annual-report years must support Arabic numerals and Chinese-number year-title variants representing 2025.
+- A Simplified Chinese A-share annual report must not rank an English version or an "H-share announcement" candidate first.
+- Annual-report and prospectus candidates must enter staging first and move to `raw/` only after structure and identity validation succeeds.
+- A staged candidate that fails validation must be deleted before ingest; an indeterminate candidate must move to `staging/review/`.
+- When ingest is required after validation, it must reuse the same page extraction instead of parsing the entire PDF again.
+- A short H-share code must not be considered matched merely because an isolated digit happens to appear in the document body.
+- Cache audits must remain read-only and identify duplicates, unreferenced files, residual staged files, and structurally abnormal files.
+- Pages with font-encoding failures and many control characters must be classified as low quality; when an old index returns no matches, the result must set `requires_ocr` instead of silently concluding that no relevant disclosure exists.
+- Layout control characters in readable tables must not trigger OCR; low-text pages without scanned-image characteristics must not trigger OCR; image-based scanned pages must still trigger OCR; lower-quality OCR output must not overwrite native text.
+- A Traditional Chinese H-share prospectus must prioritize the official listing document through the "Global Offering" title and return evidence using Traditional Chinese accounting-policy, business-segment, and revenue-disaggregation terms.
+- `prepare_filing` must ensure that neither cached nor cold paths call EvidencePacket, while preserving the original default behavior of `ensure_filing_evidence`.
+- `batch prepare` must support CSV, JSON, and JSONL; preserve input order; enforce concurrency limits; resume from checkpoints; and isolate per-item failures. It must not call EvidencePacket or the analysis workflow.
+- `batch prepare --summary-only --output ...` must write complete results to the file while omitting the full validation payload from terminal output.
+- After installing the lightweight core wheel, version, help, and server-information commands must run without implicitly importing AKShare or MCP during CLI startup. The corresponding features must remain available after installing optional dependencies.
+- GitHub Actions must run Windows/Linux multi-version tests on `main`, pull requests, and `v*` version tags, and build both sdist and wheel artifacts. Workflow permissions must be read-only for repository contents.
+- When the annual-report year is omitted, the latest version must be selected by the fiscal year in the title, including `Fiscal Year YYYY Annual Report`; if multiple candidates for the same latest year remain tied, the result must remain ambiguous.
+- With `PYTHONIOENCODING=cp936`, the CLI must still output Chinese text, bullets, and curly quotation marks, and write UTF-8 bytes to stdout.
+- Concurrent multithreaded ingest of large files must not produce SQLite write-lock conflicts; every document's page count and FTS index must remain complete.
+- A US-style annual report using `Notes to Consolidated Financial Statements` must pass completeness validation while still requiring core sections such as the auditor's report, balance sheet, and income statement.
+- When multiple Chinese query terms do not form a continuous phrase, substring fallback must rank the revenue table by keyword coverage rather than allowing purchasing or cost pages with repeated product names to displace it.
 
-性能复测基线，每类测试 5 家公司：
+Performance retest baseline, using five companies in each test category:
 
-| 场景 | 冷路径平均 | 热路径平均 | 热路径 HTTP 请求 |
+| Scenario | Average cold path | Average warm path | Warm-path HTTP requests |
 |---|---:|---:|---:|
-| A 股招股书 | 0.457 秒 | 0.038 秒 | 0 |
-| H 股招股书 | 5.685 秒 | 0.034 秒 | 0 |
-| A 股年报 | 0.421 秒 | 0.046 秒 | 0 |
-| H 股年报 | 6.846 秒 | 0.046 秒 | 0 |
+| A-share prospectus | 0.457 seconds | 0.038 seconds | 0 |
+| H-share prospectus | 5.685 seconds | 0.034 seconds | 0 |
+| A-share annual report | 0.421 seconds | 0.046 seconds | 0 |
+| H-share annual report | 6.846 seconds | 0.046 seconds | 0 |
 
-20 份文件冷路径总耗时 `67.049 秒`、32 次 HTTP 请求；重复执行的热路径总耗时 `0.820 秒`、0 次 HTTP 请求，成功率均为 `20/20`。修改前相同口径的冷路径为 `165.917 秒`，本次下降约 `59.6%`。
+The cold-path total for 20 files was `67.049 seconds` with 32 HTTP requests. Repeating the run on the warm path took `0.820 seconds` with 0 HTTP requests. Both runs achieved a `20/20` success rate. Before the change, the same cold-path measurement was `165.917 seconds`; this run reduced it by approximately `59.6%`.
 
-2026-07-11 真实港股年报测试：药明生物、信义光能、舜宇光学科技、紫金矿业、江西铜业股份、香港交易所、中芯国际、中国移动、泡泡玛特、长城汽车、吉利汽车和比亚迪股份的 2025 年英文年报及繁体中文年报均为 `12/12` 成功。英文冷下载与完整性扫描总耗时 `105.294 秒`；繁体中文测试修复标题年份兼容性后全部通过。
+Live H-share annual-report test on 2026-07-11: the 2025 English and Traditional Chinese annual reports of WuXi Biologics, Xinyi Solar, Sunny Optical Technology, Zijin Mining, Jiangxi Copper, Hong Kong Exchanges and Clearing, SMIC, China Mobile, POP MART, Great Wall Motor, Geely Automobile, and BYD Company all passed, for a `12/12` result. Cold downloads and completeness scans of the English reports took `105.294 seconds` in total. All Traditional Chinese tests passed after fixing compatibility with title-year formats.
 
-2026-07-11 真实 A 股年报测试：中远海能、万华化学、荣盛石化、恒力石化、扬农化工、汇川技术、风华高科、立讯精密、中芯国际和兆易创新的 2025 年中文版年报均为 `10/10` 成功，冷下载与完整性扫描总耗时 `11.943 秒`。
+Live A-share annual-report test on 2026-07-11: the 2025 Simplified Chinese annual reports of COSCO SHIPPING Energy Transportation, Wanhua Chemical, Rongsheng Petrochemical, Hengli Petrochemical, Yangnong Chemical, Inovance Technology, Fenghua Advanced Technology, Luxshare Precision, SMIC, and GigaDevice all passed, for a `10/10` result. Cold downloads and completeness scans took `11.943 seconds` in total.
 
-2026-07-11 收入模式和会计政策回归测试：22 份年报完整性检查均通过；会计政策查询 `22/22` 返回正文证据、页码和官方来源链接；收入模式自然语言查询 `22/22` 自动选择财务分析策略并返回收入拆分或业务分部证据，批量检索耗时 `5.585 秒`。同一批文档的离线来源查询和缓存复用均为 `22/22` 成功，未发起远程请求。
+Revenue-model and accounting-policy regression test on 2026-07-11: completeness checks passed for all 22 annual reports. Accounting-policy queries returned body-text evidence, page numbers, and official source links for `22/22` documents. Natural-language revenue-model queries automatically selected the financial-analysis strategy and returned revenue-disaggregation or business-segment evidence for `22/22` documents; the batch search took `5.585 seconds`. Offline source queries and cache reuse for the same document set also succeeded for `22/22` documents without issuing remote requests.
 
-2026-07-11 执行复盘优化：完整性规则改为必须同时识别审计报告、财务报表附注、财务状况表和利润表核心章节，22 份真实年报仍为 `22/22` 通过，模拟的长篇年度业绩公告被正确拒绝。收入模式检索不再混入费用和成本证据。高层流程无需显式 `document_id` 即可自动命中本地文档，22 家离线批量执行均跳过来源查询、下载和 PDF 扫描，总耗时 `3.510 秒`，平均每家约 `160 毫秒`。
+Post-run optimization review on 2026-07-11: completeness rules were strengthened to require simultaneous identification of the auditor's report, notes to the financial statements, statement of financial position, and income statement. All 22 live annual reports still passed, and a simulated long-form annual-results announcement was correctly rejected. Revenue-model search no longer mixed expense and cost evidence into the results. The high-level workflow can now find local documents automatically without an explicit `document_id`. Offline batch execution for all 22 companies skipped source lookup, download, and PDF scanning, taking `3.510 seconds` in total, or approximately `160 milliseconds` per company.
 
-2026-07-11 HKEX 年报召回复核：HKEX标题筛选可能漏掉标题带后缀的完整合订版，因此港股年报查询改为合并标题筛选结果与公司全部公告结果。汇丰控股测试从4个候选中正确选择2026年3月27日发布的377页`Annual Report and Accounts 2025 (with employee share plans)`，并排除两份2页发布说明。前述12家港股远程刷新后的最终链接与原下载链接全部一致，正确率为`12/12`。
+HKEX annual-report recall review on 2026-07-11: HKEX title filtering could miss complete bound editions with title suffixes, so H-share annual-report queries now merge title-filtered results with all company announcements. In the HSBC Holdings test, the system correctly selected the 377-page `Annual Report and Accounts 2025 (with employee share plans)`, published on 2026-03-27, from four candidates and excluded two two-page publication notices. After remote refresh, the final links for the 12 H-share companies listed above matched the original download links, for `12/12` accuracy.
 
-中国移动中文版复核：215页`海外監管公告 2025年年度報告`实质为A股代码600941的年度报告，不属于H股繁体年报；171页`二零二五年年報`才是英文港股年报对应的繁体版本。港股年报流程现会拒绝`海外監管公告`文档变体，即使其财务章节完整也不能通过。
+China Mobile Chinese-version review: the 215-page `Overseas Regulatory Announcement 2025 Annual Report` is substantively the annual report for A-share code 600941 and is not the H-share Traditional Chinese annual report. The 171-page `2025 Annual Report` is the Traditional Chinese counterpart to the English H-share annual report. The H-share annual-report workflow now rejects the `Overseas Regulatory Announcement` document variant even when all required financial sections are present.
 
-泡泡玛特招股书复核：两份标题均为`GLOBAL OFFERING`的HKEX文件中，9页文件为发行公告，632页文件才是正式招股书。招股书校验现要求足够页数，并识别招股章程/全球发售、风险因素、业务、财务资料和会计师报告等核心章节；9页公告状态为`rejected_short_document`，632页正式招股书状态为`complete`。
+POP MART prospectus review: of two HKEX documents titled `GLOBAL OFFERING`, the nine-page file was an offering announcement, while the 632-page file was the formal prospectus. Prospectus validation now requires a sufficient page count and recognizes core sections covering the prospectus/global offering, risk factors, business, financial information, and the accountants' report. The nine-page announcement receives status `rejected_short_document`, while the 632-page formal prospectus receives status `complete`.
 
-本地缓存审计复核：65份原始PDF中识别出2组内容完全重复文件、1组汇丰逻辑同名文件及4份未引用文件。49份可识别类型的PDF正文扫描发现2份2页汇丰发布说明不属于完整年报；23份已解析年报/招股书的公司、股票代码和年度身份校验为`23/23`通过。汇丰377页年报的旧索引另识别出363页字体编码文本异常，EvidencePacket会返回`requires_ocr=true`而不是把零命中解释为没有披露。审计未自动删除任何文件。
+Local-cache audit review: the audit identified two groups of byte-identical files, one logical duplicate group for HSBC, and four unreferenced files among 65 original PDFs. Body-text scans of 49 PDFs with identifiable document types found that two two-page HSBC publication notices were not complete annual reports. Company, stock-code, and year identity validation passed for `23/23` parsed annual reports and prospectuses. The old index for HSBC's 377-page annual report also identified page 363 as having font-encoding text corruption; EvidencePacket returns `requires_ocr=true` instead of treating zero matches as evidence that no disclosure exists. The audit did not delete any files automatically.
 
-新增批次复核：京东集团、小米集团、奇富科技、携程集团、东方甄选、阿里健康、京东健康、快手、招商银行和工商银行的最新英文年报，以及MOMENTA-W招股书，结构、身份和文本质量为`11/11`通过。MOMENTA同名611KB正式通告为11页，冷下载后状态为`rejected_short_document`并从暂存区删除；450页正式招股书通过五类核心章节校验。未指定年度的10家年报真实缓存均正确选择最新版本，其中阿里健康选择`Fiscal Year 2026 Annual Report`。
+Additional-batch review: the latest English annual reports for JD.com, Xiaomi, Qifu Technology, Trip.com Group, East Buy, Alibaba Health, JD Health, Kuaishou, China Merchants Bank, and ICBC, plus the MOMENTA-W prospectus, passed structure, identity, and text-quality validation for an `11/11` result. A same-title 611 KB MOMENTA formal notice was 11 pages long; after cold download it received status `rejected_short_document` and was removed from staging. The 450-page formal prospectus passed validation for all five core-section categories. Live caches for the ten annual reports correctly selected the latest version when no year was specified, including the `Fiscal Year 2026 Annual Report` for Alibaba Health.
 
-2026-07-11 独立空目录复核：万华化学2025年报（229页）、京东健康2025年报（170页）和MOMENTA-W招股书（450页）均完成官方来源冷查询、暂存下载、结构校验、身份校验和正式入库；11页MOMENTA正式通告在ingest前被拒绝并删除。京东健康完整离线ingest及索引耗时`3.04秒`，随后同一文档从本地索引复用耗时`0.11秒`且未查询远程来源。Ruff、Mypy、Python编译和`99 passed`自动化测试全部通过。
+Independent empty-directory review on 2026-07-11: Wanhua Chemical's 2025 annual report (229 pages), JD Health's 2025 annual report (170 pages), and the MOMENTA-W prospectus (450 pages) all completed cold lookup from official sources, staged download, structure validation, identity validation, and formal ingestion. The 11-page MOMENTA formal notice was rejected and deleted before ingest. JD Health's complete offline ingest and indexing took `3.04 seconds`; reusing the same document from the local index then took `0.11 seconds` without querying a remote source. Ruff, Mypy, Python compilation, and all `99 passed` automated tests succeeded.
 
-2026-07-12 重置后全流程复核：建设银行、工商银行、农业银行、中国移动、中国银行5份A股2025年报，腾讯控股、工商银行、中国移动、建设银行4份港股2025年报，阿里巴巴港股Fiscal Year 2026年报，以及MOMENTA-W和华润新能源招股书均完成下载、结构及身份校验和ingest，结果为`12/12`。全库为12个文档、12份PDF，A/H各6份，暂存区为0。测试中修复A股候选回退误收H股公告，以及银行年报仅使用“利润表”标题时被误判缺章节的问题；最终自动化测试为`102 passed`。
+Post-reset end-to-end review on 2026-07-12: five 2025 A-share annual reports from China Construction Bank, ICBC, Agricultural Bank of China, China Mobile, and Bank of China; four 2025 H-share annual reports from Tencent Holdings, ICBC, China Mobile, and China Construction Bank; Alibaba's H-share Fiscal Year 2026 annual report; and the MOMENTA-W and China Resources New Energy prospectuses all completed download, structure and identity validation, and ingest, for a `12/12` result. The complete library contained 12 documents and 12 PDFs, evenly split between A-share and H-share documents, with zero items remaining in staging. The test fixed an A-share candidate fallback that incorrectly admitted H-share announcements, and a false missing-section result for bank annual reports that used only the title "Income Statement." The final automated-test result was `102 passed`.
 
-2026-07-12 HKEX独立性能复核：中国海油优化前冷路径为`18.31秒`，其中来源查询`10.57秒`、下载`6.34秒`、校验`1.13秒`。条件化全公告兜底后，强制刷新相同来源的查询耗时降至`2.02秒`，已有PDF不再重复下载，总耗时`2.57秒`。独立临时目录测试中国石油股份300页年报，首次股票ID解析、单次标题来源查询、7.30MB下载和校验总耗时`11.44秒`，测试数据随后删除。刷新来源会补回已有本地PDF路径；高层文档缓存会核对PDF SHA-256和SQLite页数。Ruff、Mypy、Python编译和`110 passed`自动化测试全部通过。
+Independent HKEX performance review on 2026-07-12: before optimization, CNOOC's cold path took `18.31 seconds`, including `10.57 seconds` for source lookup, `6.34 seconds` for download, and `1.13 seconds` for validation. After adding conditional fallback to all announcements, a forced refresh of the same source reduced lookup time to `2.02 seconds`; the existing PDF was not downloaded again, and total time fell to `2.57 seconds`. In an independent temporary-directory test, PetroChina's 300-page annual report completed first-time stock-ID resolution, a single title-based source query, a 7.30 MB download, and validation in `11.44 seconds`; the test data was then deleted. Refreshing the source restores existing local PDF paths. The high-level document cache verifies PDF SHA-256 values and SQLite page counts. Ruff, Mypy, Python compilation, and all `110 passed` automated tests succeeded.
 
-2026-07-13 v1.1.0最终复核：全量自动化测试为`164 passed`。重复批量任务只执行一次，证券代码别名解析到同一文件时串行处理，实际并发数报告正确；连接失败使用10秒连接超时和最多2次尝试。A股招商银行与港股腾讯控股实时来源刷新分别约`1.67秒`和`2.22秒`并正确选中年报。sdist和wheel在全新Python 3.14环境分别构建通过；轻量wheel只安装requests和BeautifulSoup相关依赖，CLI不会提前导入AKShare、pandas、MCP或PDF组件，默认数据目录使用操作系统用户数据目录。第5轮12份真实冷路径下载、校验和ingest全部成功，总耗时约`139.65秒`；本次相同12份文件使用`--summary-only`离线复跑为`12/12`成功，内部批量耗时约`0.30秒`，完整结果保留在JSON文件且包含`output_path`。标准兼容安装包含PDF、公司数据和MCP，但不安装仅增强Markdown需要的版面模型。最终全库214份PDF与214条SQLite索引一致，无重复、孤立、缺失、暂存或待复核文件；完整正文审计214/214通过并全部复用SHA及页数一致的`pages.jsonl`，默认缓存审计优化后内部耗时约`0.83秒`且无需哈希任何唯一大小文件。Ruff、Mypy、Python编译和依赖完整性检查通过。
+Final v1.1.0 review on 2026-07-13: the full automated-test result was `164 passed`. Duplicate batch tasks ran only once, aliases resolving to the same security code were processed serially, and the actual concurrency count was reported correctly. Connection failures used a 10-second connection timeout and no more than two attempts. Live source refreshes for China Merchants Bank's A-share report and Tencent Holdings' H-share report took approximately `1.67 seconds` and `2.22 seconds`, respectively, and selected the correct annual reports. Both sdist and wheel builds passed in a clean Python 3.14 environment. The lightweight wheel installed only requests- and BeautifulSoup-related dependencies; the CLI did not import AKShare, pandas, MCP, or PDF components before they were needed, and the default data directory used the operating system's user-data directory. Round 5 cold-path downloading, validation, and ingest succeeded for all 12 live files, taking approximately `139.65 seconds` in total. Re-running the same 12 files offline with `--summary-only` succeeded for `12/12`, with an internal batch time of approximately `0.30 seconds`; complete results were retained in a JSON file containing `output_path`. The standard compatible installation included PDF, company-data, and MCP capabilities but did not install the layout model used only for enhanced Markdown. The final library had 214 PDFs aligned with 214 SQLite index entries, with no duplicates, orphans, missing files, staged files, or review-pending files. Full-body audits passed for `214/214` documents and reused `pages.jsonl` files with matching SHA values and page counts. After optimization, the default cache audit took approximately `0.83 seconds` internally and did not need to hash any uniquely sized files. Ruff, Mypy, Python compilation, and dependency-integrity checks all passed.
 
-2026-07-13 第6轮重置后复核：清空PDF、解析结果、SQLite索引和来源缓存后，宁波银行、拓荆科技、华熙生物、创科实业、信义光能、万国数据及潍柴动力A/H股2025年报，以及达梦数据、绿联科技、蓝思科技和三花智控招股书共12份文件完成官方来源查询、下载、结构及身份校验和ingest。首次批次约`144.15秒`完成`11/12`，未再出现SQLite锁冲突；万国数据374页年报因美式附注标题不含`the`被误拒，规则修复后约`16.94秒`通过。最终全清单热缓存复跑为`12/12`，内部耗时约`0.88秒`，12份PDF和12条索引一致，缺失及孤立文件均为0。中文长问题检索修复后，绿联科技招股书在仅允许2页证据时可直接返回2023年五类产品收入表。发布前独立复核进一步覆盖动态查询日期、checkpoint内容及参数校验、HTTP及流式下载重试、并发同名下载、trigram索引迁移、SQLite文件句柄释放、跨平台路径大小写规则和HKEX HEAD回退，最终自动化测试为`180 passed`，Ruff、Mypy、Python编译、sdist/wheel构建及全新虚拟环境安装均通过。
+Round 6 post-reset review on 2026-07-13: after clearing PDFs, parsed results, SQLite indexes, and source caches, 12 files completed official-source lookup, download, structure and identity validation, and ingest. The set comprised 2025 annual reports for Bank of Ningbo, Piotech, Bloomage Biotechnology, Techtronic Industries, Xinyi Solar, and GDS Holdings; the A-share and H-share annual reports of Weichai Power; and prospectuses for Dameng Data, UGREEN, Lens Technology, and Sanhua Intelligent Controls. The first batch completed `11/12` in approximately `144.15 seconds`, with no recurrence of SQLite lock conflicts. GDS Holdings' 374-page annual report was incorrectly rejected because the US-style notes title omitted `the`; after the rule was fixed, it passed in approximately `16.94 seconds`. The final warm-cache rerun of the full manifest succeeded for `12/12`, with an internal time of approximately `0.88 seconds`. The 12 PDFs matched 12 index entries, with zero missing or orphaned files. After improving long Chinese-query search, the UGREEN prospectus returned the 2023 five-category product-revenue table directly even when evidence was limited to two pages. An additional independent pre-release review covered dynamic query dates, checkpoint contents and parameter validation, HTTP and streaming-download retries, concurrent same-name downloads, trigram-index migration, SQLite file-handle release, cross-platform path case rules, and HKEX HEAD fallback. The final result was `180 passed` automated tests; Ruff, Mypy, Python compilation, sdist/wheel builds, and installation in a clean virtual environment all passed.
 
-外部网站响应时间会波动，性能验收优先检查远程请求次数，而不是只检查绝对秒数。
+External-site response times fluctuate. Performance acceptance should prioritize the number of remote requests rather than absolute elapsed time alone.
 
-## 5. 复杂财务问答压力测试
+## 5. Complex Financial Question-Answering Stress Tests
 
-复杂问答必须遵循“LLM 拆 claim 和识别口径、Kit 检索原文、LLM 复核证据、Decimal 程序勾稽、LLM 解释差异”的职责边界。不能把关键词命中当作结论，也不能让 LLM 自行心算替代确定性复算。
+Complex question answering must preserve the following division of responsibilities: the LLM decomposes claims and identifies the accounting basis; the Kit retrieves source text; the LLM reviews the evidence; Decimal-based code performs deterministic tie-outs; and the LLM explains differences. Keyword matches must not be treated as conclusions, and LLM mental arithmetic must not replace deterministic recalculation.
 
-| 编号 | 场景 | 必须取得的证据 | 确定性检查 |
+| ID | Scenario | Required evidence | Deterministic check |
 |---|---|---|---|
-| CF01 | 间接法 CFO tie-out | 净利润、非现金调整、营运资金变动、CFO | `净利润 + 调整项 + 营运资金变动 = CFO` |
-| CF02 | 港股税前利润到 CFO | 税前利润、经营产生现金、利息收取、所得税支付 | 分两段勾稽，不能混用税后净利润 |
-| CF03 | 三大活动到期末现金 | CFO、CFI、CFF、汇率、期初及期末现金 | `期初 + CFO + CFI + CFF + FX = 期末` |
-| FIN01 | 实际债务融资金额 | 借款、债券、短融收到与偿还金额 | 分别报告 gross proceeds、gross repayments 和 net principal cash flow |
-| FIN02 | 总融资现金流 | 债务、租赁、利息、股利、回购及少数股东交易 | 所有融资现金项目加总到 CFF，不得只看借款净额 |
-| FIN03 | 融资负债滚动 | 期初、融资现金、汇兑、公允价值、其他非现金变动、期末 | `opening + cash + FX + FV + other = closing` |
-| FIN04 | 租赁负债滚动 | 租赁付款、新租赁、终止、处置、利息、汇兑 | 非现金新增租赁不得计入 CFF，但必须进入负债滚动 |
-| FIN05 | 利息费用与实际支付 | P&L 利息费用、经营现金利息、融资现金利息、租赁利息 | 计算未付/应计及其他差异，不得将费用等同现金支付 |
-| FIN06 | 股利宣告与支付 | 应付股利期初、宣告、支付、期末 | 区分权益变动、负债确认和现金流时点 |
-| AH01 | A/H 现金变动勾稽 | A/H 两份报告、单位、汇率列示方式 | 用 `filters.document_ids` 联合检索并统一元/千元 |
-| WC01 | 亏损但经营现金为正 | 亏损、减值折旧、应收存货应付变化 | 量化非现金调整和营运资金各自贡献，禁止只做定性解释 |
-| NEG01 | 错误分类反向测试 | 非现金租赁或债务转换 | 故意计入现金流时必须返回 `discrepancy` |
+| CF01 | Indirect-method CFO tie-out | Net profit, non-cash adjustments, working-capital movements, CFO | `Net profit + adjustments + working-capital movements = CFO` |
+| CF02 | H-share profit before tax to CFO | Profit before tax, cash generated from operations, interest received, income tax paid | Tie out in two stages; do not mix in net profit after tax |
+| CF03 | Three cash-flow activities to ending cash | CFO, CFI, CFF, FX, opening cash, and ending cash | `Opening cash + CFO + CFI + CFF + FX = ending cash` |
+| FIN01 | Actual debt-financing amount | Proceeds and repayments from borrowings, bonds, and short-term financing | Report gross proceeds, gross repayments, and net principal cash flow separately |
+| FIN02 | Total financing cash flow | Debt, leases, interest, dividends, repurchases, and non-controlling-interest transactions | Sum all financing cash items to CFF; do not look only at net borrowings |
+| FIN03 | Financing-liability roll-forward | Opening balance, financing cash flows, FX, fair value, other non-cash movements, closing balance | `opening + cash + FX + FV + other = closing` |
+| FIN04 | Lease-liability roll-forward | Lease payments, new leases, terminations, disposals, interest, and FX | Non-cash lease additions must not enter CFF but must enter the liability roll-forward |
+| FIN05 | Interest expense versus cash paid | P&L interest expense, operating-cash interest, financing-cash interest, and lease interest | Calculate unpaid/accrued and other differences; do not equate expense with cash paid |
+| FIN06 | Dividends declared versus paid | Opening dividends payable, declarations, payments, and closing dividends payable | Distinguish equity movements, liability recognition, and cash-flow timing |
+| AH01 | A/H cash-movement tie-out | Two A/H reports, units, and exchange-rate presentation | Search jointly with `filters.document_ids` and standardize units of currency and thousands |
+| WC01 | Operating cash positive despite a loss | Loss, impairment and depreciation, and movements in receivables, inventories, and payables | Quantify the respective contributions of non-cash adjustments and working capital; qualitative explanation alone is prohibited |
+| NEG01 | Reverse test for incorrect classification | Non-cash leases or debt conversion | Deliberately including the item in cash flow must return `discrepancy` |
 
-2026-07-14 真实压力测试使用中远海控 A/H、蒙牛乳业和中升控股 2025 年报。10 个跨页/跨报告检索场景全部取得目标页面；间接法、融资现金流、融资负债、租赁负债、利息现金差异和 A/H 单位勾稽全部通过。多文档 claim 使用 `filters.document_ids` 显式限定最多 8 份本地文件，并共享整个 claim 的页数和字符预算。中升控股借款现金净流量与融资负债表现金变动相差人民币18,884千元，程序返回`discrepancy`；补检索取得交易成本净额确认及实际利率摊销政策，但报告未单独披露该差额构成，因此保持证据缺口，不强行解释。后续架构复核加入声明式计算链、`analysis_run_id`限时证据注册表、伪造evidence_id拦截、变量原始数字与证据页绑定，以及计算异常阻断完成状态。复杂财务专项自动化测试为 `42/42`，全量测试为 `231 passed`。
+The live stress test on 2026-07-14 used the 2025 A/H annual reports of COSCO SHIPPING Holdings, Mengniu Dairy, and Zhongsheng Group. All ten cross-page/cross-report retrieval scenarios obtained the target pages. The indirect-method, financing-cash-flow, financing-liability, lease-liability, interest-cash difference, and A/H unit tie-outs all passed. Multi-document claims used `filters.document_ids` to restrict searches explicitly to no more than eight local files while sharing page and character budgets across the entire claim. Zhongsheng Group's net borrowing cash flow differed from the financing-liability table's cash movement by RMB 18,884 thousand, so the program returned `discrepancy`. Supplemental retrieval found the policy for recognizing net transaction costs and amortizing them under the effective-interest method, but the report did not disclose the composition of the difference separately. The evidence gap therefore remained open and no unsupported explanation was imposed. A subsequent architecture review added declarative calculation chains, a time-limited evidence registry keyed by `analysis_run_id`, rejection of fabricated `evidence_id` values, binding of each variable's original figure to its evidence page, and blocking of completion when calculations fail. The dedicated complex-finance suite passed `42/42`, and the full suite reported `231 passed`.
 
-2026-07-14 GitHub发布前复核：修复文档ID路径穿越与根目录删除风险、共享PDF引用保护、下载来源身份误复用、未来SQLite schema降级、页面/FTS/trigram索引不一致、表格旧产物和失败状态、ingest缓存无法按需补建产物，以及复杂问答运行上下文错配、跨claim证据丢失、循环计算计划和零预算边界。无命中质量检查由最多100000页改为抽样64页。定向底层回归、Ruff和Mypy通过；该轮全量自动化测试为`288 passed`，后续增加Skill打包与安装校验后最终为`294 passed`。
+Pre-GitHub-release review on 2026-07-14: fixes covered document-ID path traversal and root-directory deletion risks, protection for shared PDF references, incorrect reuse of download-source identities, downgrade handling for future SQLite schemas, inconsistencies among page/FTS/trigram indexes, stale table artifacts and failure states, ingest-cache failure to backfill artifacts on demand, analysis-run context mismatches, lost cross-claim evidence, circular calculation plans, and zero-budget boundaries. Quality checks for no-match cases were reduced from at most 100000 pages to a 64-page sample. Targeted low-level regression tests, Ruff, and Mypy passed. The full automated suite reported `288 passed` in that round and reached `294 passed` after Skill packaging and installation validation were added.
 
-## 6. 网络测试说明
+## 6. Network-Test Notes
 
-真实数据源测试依赖 CNINFO、HKEXnews、AKShare、东方财富等外部来源。网络不可用、接口限流或上游字段变化时，测试可能失败。
+Live data-source tests depend on external sources including CNINFO, HKEXnews, AKShare, and Eastmoney. Tests may fail when the network is unavailable, interfaces are rate-limited, or upstream fields change.
 
-失败时应区分：
+When a failure occurs, distinguish among:
 
-- 本地代码 bug。
-- 上游网站不可访问。
-- 数据源接口字段变化。
-- 公司代码或年份无对应文件。
+- A local-code bug.
+- An unavailable upstream website.
+- A change to data-source interface fields.
+- No corresponding document for the company code or year.
 
 ---
-**文档创建时间：** 2026-07-03 19:31
+**Document created:** 2026-07-03 19:31
 
-**最后修改时间：** 2026-07-23 15:27
+**Last modified:** 2026-07-23 16:53
 
-**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
-
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)

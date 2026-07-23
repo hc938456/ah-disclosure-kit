@@ -14,7 +14,7 @@ Use `ah_disclosure` as the deterministic backend. Let the LLM interpret flexible
 3. Bind analysis to company, market, filing type, report period, language, and `document_id`.
 4. Treat search hits as candidates until page, table, headers, units, scope, and comparative period are reviewed.
 5. Use deterministic calculation tools for arithmetic and tie-outs; do not rely on LLM mental arithmetic.
-6. Separate disclosed facts, verified calculations, management reclassifications, and `⚠️ 推测`.
+6. Separate disclosed facts, verified calculations, management reclassifications, and `⚠️ Inference`.
 7. Never return `sufficient` with unresolved gaps or present a failed tie-out as complete.
 8. Use cleanup tools with dry-run instead of manually deleting PDFs, parsed artifacts, or SQLite rows.
 
@@ -66,6 +66,6 @@ Use subagents only after the evidence snapshot is stable and claims are independ
 Read [Troubleshooting.md](references/Troubleshooting.md) when tools are unavailable, evidence is empty, OCR is required, the wrong filing is selected, indexes disagree, or calculations fail.
 
 ---
-**文档创建时间：** 2026-07-22 18:33
-**最后修改时间：** 2026-07-22 19:14
-**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
+**Document created:** 2026-07-22 18:33
+**Last modified:** 2026-07-23 17:02
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)

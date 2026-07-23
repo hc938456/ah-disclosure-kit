@@ -1,75 +1,80 @@
-# B4 招股书与上市文件
+# B4 Prospectuses and Listing Documents
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明招股书、上市文件、聆讯资料和募集说明书的查询路径。
+This document describes the search paths for prospectuses, listing documents, hearing materials, and securities offering documents.
 
-## 1. A 股 IPO 阶段文件
+## 1. A-share IPO-stage documents
 
-A 股 IPO 审核、排队、辅导和招股书索引，优先通过 AKShare / 东方财富相关接口获取。
+A-share IPO review status, queue status, listing-preparation guidance, and prospectus indexes are retrieved primarily through relevant AKShare and Eastmoney endpoints.
 
-适用问题：
+Typical questions include:
 
 ```text
-某家公司 IPO 阶段是什么？
-IPO 招股书在哪里？
-保荐机构、会计师、律师是谁？
+What stage has a company reached in the IPO process?
+Where can I find the IPO prospectus?
+Who are the sponsor, accountants, and legal counsel?
 ```
 
-## 2. A 股已上市公司历史招股书
+## 2. Historical offering documents for listed A-share companies
 
-已上市公司的历史招股书、上市公告书、募集说明书，优先通过 CNINFO 查询。
+Historical prospectuses, listing announcements, and securities offering documents for listed companies are retrieved primarily through CNINFO.
 
-常见关键词：
+Common search concepts include:
 
-- 招股说明书。
-- 上市公告书。
-- 募集说明书。
-- 可转换公司债券募集说明书。
-- 配股说明书。
-- 非公开发行。
-- 向特定对象发行。
+- prospectus;
+- listing announcement;
+- securities offering document;
+- convertible corporate bond offering document;
+- rights issue prospectus;
+- non-public offering; and
+- offering to specific investors.
 
-## 3. 港股招股书和上市文件
+## 3. H-share prospectuses and listing documents
 
-港股招股书、上市文件、PHIP、聆讯后资料集，优先通过 HKEXnews 查询。
+H-share prospectuses, listing documents, PHIPs, and post-hearing information packs are retrieved primarily through HKEXnews.
 
-注意：
+Important considerations:
 
-- 查询通常需要港股代码或 HKEX `stockId`。
-- 不建议只凭公司名称跑全市场扫描。
-- 结果应返回来源 URL、本地 PDF 路径、发布日期和文件标题。
-- HKEX可能对发行公告和正式招股书使用相同的`GLOBAL OFFERING`标题，不能只按标题选择。
-- 应读取HKEX的文件类别和文件大小；`Listing Documents - [Offer for Subscription]`优先于`Announcements and Notices - [Formal Notice]`。
-- 正式招股书应通过页数及核心章节校验，包括招股章程/全球发售、风险因素、业务、财务资料和会计师报告。
-- 查询繁体中文港股招股书时优先使用“全球發售”，再回退至“招股章程”“上市文件”和英文关键词；中文上市文件类别中的“上市文件 - [發售以供認購]”优先级高于“公告及通告 - [正式通告]”。
-- 繁体中文招股书分析应同时使用“收入確認”“重大會計政策”“分部資料”“收入分拆”“主要產品及服務”等检索词，避免正确下载后因简繁差异返回空证据包。
-- 正文还应匹配目标公司或股票代码及预期年度，避免结构完整但属于其他发行人的文件进入正式缓存。
-- 短篇发行公告应标记为`rejected_short_document`并继续检查下一个候选。
+- Searches usually require an H-share code or HKEX `stockId`.
+- A market-wide scan based only on a company name is not recommended.
+- Results should include the source URL, local PDF path, publication date, and document title.
+- HKEX may use the same `GLOBAL OFFERING` title for both an offering announcement and the formal prospectus, so title alone is not sufficient for selection.
+- The workflow should inspect the HKEX document category and file size. `Listing Documents - [Offer for Subscription]` takes precedence over `Announcements and Notices - [Formal Notice]`.
+- A formal prospectus must pass page-count and core-section validation, including the prospectus or global offering, risk factors, business, financial information, and accountants' report sections.
+- For Traditional Chinese H-share prospectuses, the search should prioritize the Traditional Chinese term for "global offering," then fall back to terms for "prospectus," "listing document," and relevant English keywords. Within Chinese listing-document categories, `Listing Documents - [Offer for Subscription]` takes precedence over `Announcements and Notices - [Formal Notice]`.
+- Analysis of a Traditional Chinese prospectus should search concurrently for the Traditional Chinese equivalents of "revenue recognition," "significant accounting policies," "segment information," "revenue disaggregation," and "principal products and services." This prevents an empty evidence package caused by script differences after the correct document has been downloaded.
+- The document body must also match the target company or stock code and the expected year, preventing a structurally complete document for another issuer from entering the production cache.
+- A short offering announcement should be marked `rejected_short_document`, after which the workflow should continue to the next candidate.
 
-## 4. 下载和解析
+## 4. Download and ingest
 
-A股募集说明书会按可转债、公司债、增发、配股和其他融资分类查询。只要任一分类返回正式文件，结果仅保留文件候选；如果所有分类都因来源异常失败，则返回带来源、分类和错误类型的结构化错误，不能把上游超时解释为“没有文件”。
+A-share securities offering documents are queried by category: convertible bonds, corporate bonds, follow-on offerings, rights issues, and other financing. If any category returns a formal document, the result retains only document candidates. If every category fails because of source errors, the workflow returns a structured error containing the source, category, and error type. An upstream timeout must not be interpreted as "no document found."
 
-只要求下载时：
+For download-only requests:
 
 ```text
 download_prospectus_tool
--> 下载到暂存区
--> 校验结构和文档身份
--> 通过后保存到 raw/
--> 返回路径和 URL
+-> download to staging
+-> validate structure and document identity
+-> save to raw/ after validation passes
+-> return the path and URL
 ```
 
-要求分析时：
+For requests that include analysis:
 
 ```text
 download_and_ingest_prospectus_tool
--> 暂存并校验 PDF
--> 通过后移动到 raw/
--> 复用校验时抽取的页面执行 ingest
+-> stage and validate the PDF
+-> move it to raw/ after validation passes
+-> reuse pages extracted during validation for ingest
 -> SQLite FTS
 -> EvidencePacket
--> 大模型分析
+-> LLM analysis
 ```
+
+---
+**Document created:** 2026-07-03 19:31
+**Last modified:** 2026-07-23 16:53
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
 

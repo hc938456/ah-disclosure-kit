@@ -80,7 +80,7 @@ def test_skill_frontmatter_and_links_are_self_contained() -> None:
 
 def test_openai_metadata_declares_the_real_mcp_dependency() -> None:
     text = (SKILL_ROOT / "agents" / "openai.yaml").read_text(encoding="utf-8")
-    assert 'display_name: "A/H 披露分析"' in text
+    assert 'display_name: "A/H Disclosure Analysis"' in text
     assert "$ah-disclosure" in text
     assert 'type: "mcp"' in text
     assert 'value: "ah_disclosure"' in text

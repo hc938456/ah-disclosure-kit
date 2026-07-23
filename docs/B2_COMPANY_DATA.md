@@ -1,73 +1,78 @@
-# B2 公司数据
+# B2 Company Data
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明 A 股和港股结构化公司数据的来源和边界。
+This document describes the sources and scope of structured company data for A-shares and H-shares.
 
-## 1. 数据源
+## 1. Data source
 
-结构化公司数据优先通过 AKShare 获取。
+Structured company data is retrieved primarily through AKShare.
 
-原因：
+Rationale:
 
-- AKShare 已经封装大量 A 股和港股公司数据接口。
-- 结构化数据适合快速查询财务报表、财务指标、分红和股东数据。
-- 这些数据不需要先下载 PDF 再抽取。
+- AKShare provides a unified interface to numerous A-share and H-share company-data endpoints.
+- Structured data is well suited to fast queries for financial statements, financial indicators, dividends, and shareholder information.
+- These data can be queried without first downloading and extracting a PDF.
 
-## 2. A 股支持范围
+## 2. A-share coverage
 
-常见能力包括：
+Common capabilities include:
 
-- 公司资料。
-- 主营业务。
-- 主营构成。
-- 资产负债表。
-- 利润表。
-- 现金流量表。
-- 财务指标。
-- 分红派息。
-- 股东户数。
-- 股东和持股相关数据。
-- 股本结构和股本变动。
+- company profiles;
+- principal business activities;
+- revenue composition;
+- balance sheets;
+- income statements;
+- cash flow statements;
+- financial indicators;
+- dividends and distributions;
+- number of shareholders;
+- shareholder and ownership data; and
+- share-capital structure and changes.
 
-## 3. 港股支持范围
+## 3. H-share coverage
 
-常见能力包括：
+Common capabilities include:
 
-- 证券资料。
-- 公司资料。
-- 财务报表。
-- 财务指标。
-- 分红派息。
+- security profiles;
+- company profiles;
+- financial statements;
+- financial indicators; and
+- dividends and distributions.
 
-## 4. 与 PDF 的关系
+## 4. Relationship to PDF documents
 
-结构化数据适合快速回答：
-
-```text
-腾讯 2025 年收入和净利润是多少？
-招商证券 2025 年利润表主要科目是多少？
-美团 2026 Q1 收入、毛利、净利润是多少？
-```
-
-PDF 适合回答：
+Structured data is suitable for quickly answering questions such as:
 
 ```text
-收入确认政策是什么？
-管理层如何解释利润下滑？
-外卖补贴如何会计处理？
-年报某个附注原文怎么说？
+What were Tencent's revenue and net profit in 2025?
+What were the major line items in China Merchants Securities' 2025 income statement?
+What were Meituan's revenue, gross profit, and net profit in Q1 2026?
 ```
 
-## 5. 单位提醒
+PDF documents are more suitable for questions such as:
 
-结构化数据的单位取决于 AKShare 返回接口，不能一律假设为元。
+```text
+What is the revenue recognition policy?
+How did management explain the decline in profit?
+How are food-delivery subsidies accounted for?
+What does a specific note in the annual report say?
+```
 
-回答时应检查字段名、接口说明或返回表头，必要时明确说明单位来源。
+## 5. Units
 
-## 6. 缓存
+Units depend on the AKShare endpoint and must not be assumed to be yuan in every case.
 
-结构化查询结果可写入 SQLite，减少重复请求。
+Before answering, check field names, endpoint documentation, or returned column headers. State the source of the unit explicitly when necessary.
 
-当前版本支持港股结构化数据基础调用，并将结果写入SQLite供本地复用。不同AKShare接口的字段、单位和覆盖范围并不完全一致，分析前仍需核对接口名、返回字段和报告口径。
+## 6. Caching
+
+Structured query results can be written to SQLite to reduce repeated requests.
+
+The current version supports core structured-data calls for H-shares and writes the results to SQLite for local reuse. Fields, units, and coverage vary across AKShare endpoints, so the endpoint name, returned fields, and reporting basis must still be verified before analysis.
+
+---
+**Document created:** 2026-07-03 19:31
+**Last modified:** 2026-07-23 16:53
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
 

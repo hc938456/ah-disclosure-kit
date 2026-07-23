@@ -1,10 +1,10 @@
-# A2 本地更新安装
+# A2 Updating a Local Installation
 
-文档导航：[A0 文档索引](./A0_DOC_INDEX.md)
+Documentation navigation: [A0 Documentation Index](./A0_DOC_INDEX.md)
 
-本文说明代码、依赖、Skill 和 MCP 的更新方式。
+This guide explains how to update the code, dependencies, Skill, and MCP server.
 
-如果使用GitHub发布版本，先切换到实际已经发布的目标Tag再安装，避免本地源码版本与文档版本不一致。下面的`<version>`应替换为GitHub Releases页面中存在的版本号；发布前不要假定本地版本已经有对应Tag：
+When using a GitHub release, switch to the target tag that has actually been published before installing. This prevents the local source version from diverging from the documentation version. Replace `<version>` below with a version that exists on the GitHub Releases page. Do not assume that a local version already has a corresponding tag before it is released:
 
 ```powershell
 git fetch --tags
@@ -12,68 +12,63 @@ git checkout v<version>
 python -m pip install -e ".[pdf,company-data,mcp]"
 ```
 
-## 1. 代码更新后
+## 1. After Updating the Code
 
-如果只是修改 Python 源码，且已经使用 editable 模式安装：
+If only Python source files changed and the package is already installed in editable mode, reinstallation is generally unnecessary. Restart the MCP server to load the latest source code.
 
-```powershell
-python -m pip install -e ".[pdf,company-data,mcp]"
-```
+Run the editable-install command again only when package metadata, entry points, or dependencies changed.
 
-一般不需要重新安装，重启 MCP 会读取最新源码。
+## 2. After Updating Dependencies
 
-## 2. 依赖更新后
-
-如果 `pyproject.toml` 或可选依赖发生变化，重新安装：
+If `pyproject.toml` or optional dependencies changed, reinstall:
 
 ```powershell
 python -m pip install -e ".[all]"
 ```
 
-## 3. Skill 更新后
+## 3. After Updating the Skill
 
-仓库中的下列目录是 Skill 的规范源：
+The following directory in the repository is the canonical source for the Skill:
 
 ```text
 skills/ah-disclosure/
 ```
 
-更新后必须同步整个目录，而不只是 `SKILL.md`，否则 `agents/` 和 `references/` 会漂移。用户级安装位置为：
+After an update, synchronize the entire directory rather than only `SKILL.md`; otherwise, the `agents/` and `references/` directories may drift. The user-level installation directory is:
 
 ```text
-C:\Users\<用户名>\.agents\skills\ah-disclosure\
+C:\Users\<username>\.agents\skills\ah-disclosure\
 ```
 
-项目级安装也可以同步到项目根目录的 `.agents\skills\ah-disclosure\`。运行 `scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot "C:\目标项目\.agents\skills"` 会先清理旧目标，再从规范源完整复制，避免遗留已删除的 reference 文件。同步后重启当前 Claude Code / Codex 会话。
+You may also install the Skill at the project level by synchronizing it to `.agents\skills\ah-disclosure\` under the project root. Running `scripts\INSTALL_AND_CHECK.ps1 -SkillInstallRoot "C:\target-project\.agents\skills"` removes the old destination first and then copies the canonical source in full, preventing deleted reference files from being left behind. Restart the current Claude Code or Codex session after synchronization.
 
-## 4. MCP 更新后
+## 4. After Updating the MCP Server
 
-如果只是改函数内部逻辑，通常只需要重启 Claude Code / Codex 会话。
+If only internal function logic changed, restarting the Claude Code or Codex session is usually sufficient.
 
-如果 MCP 名称或启动命令改变，才需要重新注册：
+You need to register the server again only if the MCP name or startup command changed:
 
 ```powershell
 claude mcp add --transport stdio --scope user ah-disclosure "python -m ah_disclosure.mcp_server"
 ```
 
-## 5. 数据目录更新后
+## 5. After Changing the Data Directory
 
-如果修改了 `AH_DISCLOSURE_DATA_DIR`，需要重新启动 MCP 会话。
+Restart the MCP session after changing `AH_DISCLOSURE_DATA_DIR`.
 
-源码checkout与wheel安装的默认数据目录不同。更新安装方式不会自动迁移已有数据；需要继续使用原数据时，应显式保持同一个`AH_DISCLOSURE_DATA_DIR`。
+Source checkouts and wheel installations use different default data directories. Updating the installation method does not migrate existing data automatically. To continue using existing data, explicitly preserve the same `AH_DISCLOSURE_DATA_DIR`.
 
-不要手工删除 `raw/` 或 `parsed/` 后忽略 SQLite。删除单个公司或文档时，应使用：
+Do not manually delete files from `raw/` or `parsed/` while leaving SQLite unchanged. To remove an individual company or document, use:
 
 - `cleanup_document_tool`
 - `cleanup_company_tool`
 - `reconcile_local_index_tool`
 
-这样可以让 PDF、解析产物和 SQLite 索引保持一致。
+These tools keep PDFs, parsed artifacts, and the SQLite index consistent.
 
 ---
-**文档创建时间：** 2026-07-03 15:44
+**Document created:** 2026-07-03 15:44
 
-**最后修改时间：** 2026-07-23 14:52
+**Last modified:** 2026-07-23 17:36
 
-**最后修改模型：** 未设置（ANTHROPIC_MODEL 为空）
-
+**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
