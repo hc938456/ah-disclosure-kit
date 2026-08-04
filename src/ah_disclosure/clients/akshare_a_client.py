@@ -19,8 +19,17 @@ ALL_MARKET_CODE_INTERFACES = {
 }
 
 DIRECT_FILTER_INTERFACES = {
+    "stock_gdfx_free_holding_detail_em",
+    "stock_individual_info_em",
     "stock_repurchase_em",
     "stock_esg_hz_sina",
+}
+
+DIRECT_INTERFACE_SOURCES = {
+    "stock_gdfx_free_holding_detail_em": "Eastmoney direct",
+    "stock_individual_info_em": "Eastmoney direct",
+    "stock_repurchase_em": "Eastmoney direct",
+    "stock_esg_hz_sina": "Sina direct",
 }
 
 
@@ -84,6 +93,116 @@ class ACompanyClient:
         data = resp.json()
         return list(((data.get("result") or {}).get("data") or []))
 
+    def _stock_top_float_shareholders_filtered(
+        self,
+        symbol: str,
+        date: str | None = None,
+    ) -> list[dict[str, Any]]:
+        code = normalize_a_symbol(symbol)
+        report_date = None
+        if date is not None:
+            compact_date = str(date).strip().replace("-", "")
+            if len(compact_date) != 8 or not compact_date.isdigit():
+                raise ValueError("date must use YYYYMMDD or YYYY-MM-DD format.")
+            report_date = (
+                f"{compact_date[:4]}-{compact_date[4:6]}-{compact_date[6:]}"
+            )
+        filters = [f'(SECURITY_CODE="{code}")']
+        if report_date is not None:
+            filters.insert(0, f"(END_DATE='{report_date}')")
+        url = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+        params = {
+            "sortColumns": "UPDATE_DATE,SECURITY_CODE,HOLDER_RANK",
+            "sortTypes": "-1,1,1",
+            "pageSize": "100",
+            "pageNumber": "1",
+            "reportName": "RPT_F10_EH_FREEHOLDERS",
+            "columns": "ALL",
+            "source": "WEB",
+            "client": "WEB",
+            "filter": "".join(filters),
+        }
+        resp = requests.get(url, params=params, timeout=20)
+        resp.raise_for_status()
+        payload = resp.json()
+        if payload.get("success") is False:
+            raise RuntimeError(
+                f"Eastmoney top-float-shareholder query failed: "
+                f"{payload.get('message') or payload.get('code') or 'unknown error'}"
+            )
+        raw_rows = list(((payload.get("result") or {}).get("data") or []))
+
+        def date_only(value: Any) -> Any:
+            if isinstance(value, str) and len(value) >= 10:
+                return value[:10]
+            return value
+
+        if report_date is None and raw_rows:
+            latest_report_date = date_only(raw_rows[0].get("END_DATE"))
+            raw_rows = [
+                row
+                for row in raw_rows
+                if date_only(row.get("END_DATE")) == latest_report_date
+            ]
+
+        return [
+            {
+                "序号": index,
+                "股东名称": row.get("HOLDER_NAME"),
+                "股东类型": row.get("HOLDER_TYPE"),
+                "股票代码": row.get("SECURITY_CODE"),
+                "股票简称": row.get("SECURITY_NAME_ABBR"),
+                "报告期": date_only(row.get("END_DATE")),
+                "期末持股-数量": row.get("HOLD_NUM"),
+                "期末持股-数量变化": row.get("XZCHANGE"),
+                "期末持股-数量变化比例": row.get("CHANGE_RATIO"),
+                "期末持股-持股变动": row.get("HOLDNUM_CHANGE_NAME"),
+                "期末持股-流通市值": row.get("HOLDER_MARKET_CAP"),
+                "公告日": date_only(row.get("UPDATE_DATE")),
+            }
+            for index, row in enumerate(raw_rows, start=1)
+        ]
+
+    def _stock_individual_info_filtered(
+        self,
+        symbol: str,
+        timeout: float = 15,
+    ) -> list[dict[str, Any]]:
+        code = normalize_a_symbol(symbol)
+        market_code = 1 if code.startswith("6") else 0
+        url = "https://push2delay.eastmoney.com/api/qt/stock/get"
+        field_labels = [
+            ("f43", "最新"),
+            ("f57", "股票代码"),
+            ("f58", "股票简称"),
+            ("f84", "总股本"),
+            ("f85", "流通股"),
+            ("f116", "总市值"),
+            ("f117", "流通市值"),
+            ("f127", "行业"),
+            ("f189", "上市时间"),
+        ]
+        params = {
+            "fltt": "2",
+            "invt": "2",
+            "fields": ",".join(field for field, _ in field_labels),
+            "secid": f"{market_code}.{code}",
+        }
+        resp = requests.get(url, params=params, timeout=timeout)
+        resp.raise_for_status()
+        payload = resp.json()
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise RuntimeError(
+                f"Eastmoney company-info query failed: "
+                f"{payload.get('message') or payload.get('rc') or 'empty data'}"
+            )
+        return [
+            {"item": label, "value": data.get(field)}
+            for field, label in field_labels
+            if field in data
+        ]
+
     def _stock_esg_filtered(self, symbol: str) -> list[dict[str, Any]]:
         code = normalize_a_symbol(symbol)
         dotted_code = f"{code}.SH" if code.startswith(("6", "9")) else f"{code}.SZ"
@@ -124,6 +243,7 @@ class ACompanyClient:
     def call_interface(self, data_type: str, symbol: str, max_rows: int | None = None, **params: Any) -> CompanyDataResult:
         interface = A_INTERFACES.get(data_type, data_type)
         func = None if interface in DIRECT_FILTER_INTERFACES else get_akshare_function(interface)
+        result_source = DIRECT_INTERFACE_SOURCES.get(interface, self.source)
         call_params = self._build_params(interface, symbol, dict(params))
         cache_params = {
             "symbol": normalize_a_symbol(symbol),
@@ -139,6 +259,16 @@ class ACompanyClient:
         try:
             if interface == "stock_repurchase_em":
                 raw = self._stock_repurchase_filtered(symbol)
+            elif interface == "stock_gdfx_free_holding_detail_em":
+                raw = self._stock_top_float_shareholders_filtered(
+                    symbol,
+                    date=call_params.get("date"),
+                )
+            elif interface == "stock_individual_info_em":
+                raw = self._stock_individual_info_filtered(
+                    symbol,
+                    timeout=float(call_params.get("timeout") or 15),
+                )
             elif interface == "stock_esg_hz_sina":
                 raw = self._stock_esg_filtered(symbol)
             else:
@@ -154,7 +284,7 @@ class ACompanyClient:
                 normalize_a_symbol(symbol),
                 data_type,
                 interface,
-                self.source,
+                result_source,
                 now_iso(),
                 [{"error": f"{type(exc).__name__}: {exc}"}],
                 ["error"],
@@ -172,7 +302,7 @@ class ACompanyClient:
             normalize_a_symbol(symbol),
             data_type,
             interface,
-            self.source,
+            result_source,
             now_iso(),
             rows,
             cols,
@@ -220,6 +350,9 @@ class ACompanyClient:
             start_year = params.pop("start_year", None)
             if start_year is not None:
                 params["start_year"] = str(start_year)
+            return {"symbol": code, **params}
+        if interface == "stock_individual_info_em":
+            params.setdefault("timeout", 20)
             return {"symbol": code, **params}
         if interface in {
             "stock_hold_num_cninfo",

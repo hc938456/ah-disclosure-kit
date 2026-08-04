@@ -17,25 +17,36 @@ Use `ah_disclosure` as the deterministic backend. Let the LLM interpret flexible
 6. Separate disclosed facts, verified calculations, management reclassifications, and `⚠️ Inference`.
 7. Never return `sufficient` with unresolved gaps or present a failed tie-out as complete.
 8. Use cleanup tools with dry-run instead of manually deleting PDFs, parsed artifacts, or SQLite rows.
+9. CNINFO source lookups are internally bounded and automatically probe source cache after timeout or network failure. Treat `source_lookup_timeout`, `source_lookup_error`, or a host timeout as a failed stage; inspect `execution_info` and resume from the first missing stage instead of repeating a monolithic call.
 
 ## Route the request
 
 - Source or candidate only: use `find_filing_source_tool`.
 - Annual-report download only: use `download_report_tool`; do not ingest.
-- Annual-report download plus ingest: use `download_and_ingest_report` with `ingest=true`.
+- Annual-report download plus ingest: reuse an exact ready local document when available. On a cold start, use `find_filing_source_tool` → `download_report_tool` → cache-ready `download_and_ingest_report` with `ingest=true`. Never start with or repeat the combined call after a timeout.
 - Prospectus or listing document: use `search_prospectus_tool`, then `download_prospectus_tool` for download only or `download_and_ingest_prospectus_tool` when ingest is required.
 - Local PDF ingest: use `ingest_pdf_tool`.
 - Structured company facts: use `get_company_profile_tool`, `get_financial_statements_tool`, `get_financial_indicators_tool`, `get_dividends_tool`, `get_shareholders_tool`, `get_capital_actions_tool`, or `get_governance_esg_tool` according to the requested dataset.
 - Business descriptions or composition: use `get_business_info_tool`.
 - Multi-source overview: use `build_company_dossier_tool`; use `compare_structured_data_with_report_tool` only for an explicit provider-versus-filing comparison.
 - Inspect existing local documents: use `list_local_documents_tool`, then `get_document_meta_tool` when details are needed.
-- Filing not yet ready for analysis: use `ensure_filing_evidence_tool`.
+- Filing not yet ready for analysis: use the staged preparation path below. Use `ensure_filing_evidence_tool` only when a cache-ready one-call path is appropriate.
 - Already-ingested filing, simple question: use `get_evidence_packet_tool` with `strategy="accounting_policy"` or `strategy="financial_analysis"` when the intent is clear.
 - Clipped page or multi-page table: use `get_document_pages_tool`.
 - Complex, multi-claim, or non-standard question: use the analysis protocol below.
 - Installation, data-directory, or version uncertainty: call `server_info`.
 
 Read [Operations.md](references/Operations.md) for source, validation, ingest, OCR, cache, batch, and cleanup decisions.
+
+## Prepare a filing without blind waits
+
+1. Check exact local readiness by company, market, filing type, year, language, and `document_id`.
+2. If no ready document exists, locate the official source without downloading.
+3. Download and validate the selected filing without ingesting.
+4. Once the PDF and validation cache are ready, call `download_and_ingest_report` with the same identity and `ingest=true` so filing metadata is preserved, then retrieve evidence.
+5. After a CNINFO timeout, first inspect `execution_info.source_timeout_recovered`; the Kit has already probed source cache. After a host or combined-stage timeout, check source cache and local artifacts, then resume at the first incomplete stage instead of restarting the workflow.
+
+Keep answer language separate from filing language. For HKEX analysis, when a Chinese PDF has substantial extracted text but zero required-section matches, garbled or unusable evidence, or a broken text layer, try the same official English filing before OCR or manual diagnosis. Preserve company, code, year, filing type, and official-source identity, and disclose the language switch.
 
 ## Analyze complex questions
 
@@ -67,5 +78,5 @@ Read [Troubleshooting.md](references/Troubleshooting.md) when tools are unavaila
 
 ---
 **Document created:** 2026-07-22 18:33
-**Last modified:** 2026-07-23 17:02
-**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
+**Last modified:** 2026-07-30 00:37
+**Last modified model:** OpenAI GPT

@@ -12,10 +12,10 @@ Run from the Kit root directory:
 python -m pytest -q
 ```
 
-Current v1.1.2 release-candidate test result:
+Current v1.1.3 release-candidate test result:
 
 ```text
-294 passed
+309 passed
 ```
 
 ### 1.1 Post-Ingest Live Question-Answering Acceptance
@@ -180,6 +180,6 @@ When a failure occurs, distinguish among:
 ---
 **Document created:** 2026-07-03 19:31
 
-**Last modified:** 2026-07-23 16:53
+**Last modified:** 2026-08-05 00:26
 
-**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
+**Last modified model:** OpenAI GPT

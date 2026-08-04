@@ -2,6 +2,17 @@
 
 Documentation index: [A0 Documentation Index](./docs/A0_DOC_INDEX.md)
 
+## v1.1.3
+
+This release publishes the local post-v1.1.2 implementation updates while keeping the public repository's documentation and Skill metadata in English.
+
+- Added bounded CNINFO source lookup, automatic source-cache recovery, and structured timeout/error status reporting.
+- Added staged cold-start filing preparation and HKEX alternate-language fallback for broken or unusable Chinese PDF text layers.
+- Expanded A-share and AKShare parameter forwarding, cache behavior, configuration controls, and filing-pipeline validation.
+- Updated the `akshare` company-data dependency floor to `1.18.81`.
+- Added regression coverage for source-cache recovery, filing selection, A-share data forwarding, and MCP company-data options.
+- Validated with 309 tests, Ruff, Mypy, and Python compilation.
+
 ## v1.1.2
 
 This release internationalizes the GitHub documentation and public Skill metadata into English while retaining `README.zh-CN.md`.
@@ -198,6 +209,6 @@ Highlights:
 ---
 **Document created:** 2026-07-03 19:31
 
-**Last modified:** 2026-07-23 17:12
+**Last modified:** 2026-08-05 00:26
 
-**Last modified model:** Not set (`ANTHROPIC_MODEL` is empty)
+**Last modified model:** OpenAI GPT

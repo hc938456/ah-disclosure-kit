@@ -16,6 +16,8 @@ except Exception:  # pragma: no cover
 class Settings:
     data_dir: Path
     log_level: str = "INFO"
+    cninfo_request_timeout_seconds: float = 10.0
+    cninfo_lookup_budget_seconds: float = 40.0
     cache_ttl_days: int = 7
     akshare_ttl_days: int = 7
     cninfo_ttl_days: int = 1
@@ -104,6 +106,7 @@ def get_settings() -> Settings:
     pdf = config.get("pdf", {}) if isinstance(config, dict) else {}
     logging = config.get("logging", {}) if isinstance(config, dict) else {}
     llm = config.get("llm", {}) if isinstance(config, dict) else {}
+    network = config.get("network", {}) if isinstance(config, dict) else {}
 
     data_dir_value = (
         os.getenv("AH_DISCLOSURE_DATA_DIR")
@@ -121,6 +124,14 @@ def get_settings() -> Settings:
     return Settings(
         data_dir=data_dir,
         log_level=os.getenv("AH_DISCLOSURE_LOG_LEVEL") or os.getenv("AH_FILINGS_LOG_LEVEL") or logging.get("level", "INFO"),
+        cninfo_request_timeout_seconds=float(
+            os.getenv("AH_DISCLOSURE_CNINFO_REQUEST_TIMEOUT_SECONDS")
+            or network.get("cninfo_request_timeout_seconds", 10.0)
+        ),
+        cninfo_lookup_budget_seconds=float(
+            os.getenv("AH_DISCLOSURE_CNINFO_LOOKUP_BUDGET_SECONDS")
+            or network.get("cninfo_lookup_budget_seconds", 40.0)
+        ),
         cache_ttl_days=int(os.getenv("AH_DISCLOSURE_CACHE_TTL_DAYS") or os.getenv("AH_FILINGS_CACHE_TTL_DAYS") or cache.get("ttl_days", 7)),
         akshare_ttl_days=int(cache.get("akshare_ttl_days", cache.get("ttl_days", 7))),
         cninfo_ttl_days=int(cache.get("cninfo_ttl_days", 1)),

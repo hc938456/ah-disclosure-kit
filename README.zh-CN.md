@@ -11,7 +11,7 @@
 
 **A/H-share disclosure documents, structured company data, HKEXnews/CNINFO PDF ingest, local search, and MCP tools for evidence-backed financial analysis.**
 
-> 当前版本：[`v1.1.2`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.2)
+> 当前版本：[`v1.1.3`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.3)
 >
 > 这不是行情或交易决策系统，不提供实时行情、K 线、盘口、择时或投资建议。
 
@@ -52,13 +52,13 @@ flowchart LR
 从 [Latest Release](https://github.com/hc938456/ah-disclosure-kit/releases/latest) 下载：
 
 ```text
-ah-disclosure-kit-v1.1.2.zip
+ah-disclosure-kit-v1.1.3.zip
 ```
 
 解压到一个长期保留的目录，并在解压后的项目目录中打开 Windows PowerShell：
 
 ```powershell
-Set-Location "C:\path\to\ah-disclosure-kit-v1.1.2"
+Set-Location "C:\path\to\ah-disclosure-kit-v1.1.3"
 ```
 
 如需与其他 Python 工具隔离，可以先创建并启用独立虚拟环境：
@@ -165,7 +165,7 @@ codex mcp list
 预期版本：
 
 ```text
-1.1.2
+1.1.3
 ```
 
 `server-info` 返回的数据目录是运行时权威路径，不要根据启动命令所在目录猜测。
@@ -287,7 +287,7 @@ macOS/Linux 可安装 Python 包并接入 stdio MCP，但当前一键安装脚�
 
 ## Release
 
-- 最新正式版本：[`v1.1.2`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.2)
+- 最新正式版本：[`v1.1.3`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.3)
 - 完整变更记录：[CHANGELOG.md](./CHANGELOG.md)
 - 问题反馈：[GitHub Issues](https://github.com/hc938456/ah-disclosure-kit/issues)
 
