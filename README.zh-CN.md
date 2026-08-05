@@ -274,7 +274,7 @@ Skill 工作流入口：
 
 - Python 3.11、3.12、3.13、3.14；
 - Windows 与 Linux GitHub Actions 测试矩阵；
-- Ruff、Mypy、294 项自动化测试；
+- Ruff、Mypy、309 项自动化测试；
 - 完整 extras 安装、CLI/MCP smoke test、sdist 和 wheel 构建。
 
 macOS/Linux 可安装 Python 包并接入 stdio MCP，但当前一键安装脚本和操作说明主要面向 Windows PowerShell。
