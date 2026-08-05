@@ -273,7 +273,7 @@ Skill workflow:
 
 - Python 3.11, 3.12, 3.13, and 3.14;
 - Windows and Linux GitHub Actions matrix;
-- Ruff, Mypy, and 294 automated tests;
+- Ruff, Mypy, and 309 automated tests;
 - full-extras installation, CLI/MCP smoke tests, and sdist/wheel builds.
 
 The Python package and stdio MCP server can run on macOS/Linux, but the one-command installer and current operations guide are primarily designed for Windows PowerShell.
