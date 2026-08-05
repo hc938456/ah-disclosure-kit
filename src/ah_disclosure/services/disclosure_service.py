@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from ah_disclosure.clients.cninfo_client import CninfoClient
+from ah_disclosure.clients.cninfo_client import (
+    CninfoClient,
+    CninfoLookupTimeoutError,
+    CninfoSourceLookupError,
+)
 from ah_disclosure.clients.hkex_client import (
     HkexClient,
     get_thread_hkex_client,
@@ -22,6 +26,8 @@ from ah_disclosure.services.source_lookup import build_query_signature, historic
 from ah_disclosure.storage.sqlite_store import SQLiteStore
 
 HKEX_CACHE_FETCH_ROWS = 500
+A_SOURCE_CACHE_FETCH_ROWS = 60
+A_ANNUAL_SOURCE_FETCH_ROWS = A_SOURCE_CACHE_FETCH_ROWS
 
 
 def _persist_filings(records: list[dict]) -> None:
@@ -54,7 +60,12 @@ def search_a_filings(
     offline: bool = False,
     max_cache_age_seconds: int | None = None,
 ) -> list[dict]:
+    requested_rows = max(int(max_rows), 0)
+    if requested_rows == 0:
+        return []
+    requested_end_date = end_date
     end_date = end_date or current_date_yyyymmdd()
+    fetch_rows = max(A_SOURCE_CACHE_FETCH_ROWS, requested_rows)
     store = SQLiteStore()
     signature = build_query_signature(
         "CNINFO",
@@ -63,17 +74,82 @@ def search_a_filings(
         category=category,
         keyword=keyword,
         start_date=start_date,
-        end_date=end_date,
-        max_rows=max_rows,
+        end_date=end_date if requested_end_date else "latest",
     )
+    legacy_signatures = [
+        (
+            build_query_signature(
+                "CNINFO",
+                market="A",
+                symbol=symbol,
+                category=category,
+                keyword=keyword,
+                start_date=start_date,
+                end_date=end_date,
+                max_rows=legacy_rows,
+            ),
+            legacy_rows,
+        )
+        for legacy_rows in dict.fromkeys((requested_rows, fetch_rows, 200))
+    ]
+
+    def cached_entries(*, include_stale: bool) -> list[tuple[dict, int | None]]:
+        entries: list[tuple[dict, int | None]] = []
+        current = store.get_source_query(
+            signature,
+            include_stale=include_stale,
+            max_age_seconds=None if include_stale else max_cache_age_seconds,
+        )
+        if current is not None:
+            entries.append((current, None))
+        for legacy_signature, legacy_limit in legacy_signatures:
+            legacy = store.get_source_query(
+                legacy_signature,
+                include_stale=include_stale,
+                max_age_seconds=None if include_stale else max_cache_age_seconds,
+            )
+            if legacy is not None:
+                entries.append((legacy, legacy_limit))
+        return entries
+
+    def usable_cached_records(*, include_stale: bool) -> list[dict] | None:
+        entries = cached_entries(include_stale=include_stale)
+        if not entries:
+            return None
+        if include_stale:
+            records = max(entries, key=lambda entry: len(entry[0]["records"]))[0][
+                "records"
+            ]
+            return records[:requested_rows]
+        for cached, legacy_limit in entries:
+            records = cached["records"]
+            enough = len(records) >= requested_rows
+            complete = (
+                len(records) < A_SOURCE_CACHE_FETCH_ROWS
+                if legacy_limit is None
+                else len(records) < legacy_limit
+            )
+            if enough or complete:
+                if legacy_limit is not None:
+                    store.put_source_query(
+                        signature,
+                        records,
+                        source="CNINFO",
+                        ttl_seconds=source_ttl_seconds(
+                            "CNINFO", max_cache_age_seconds
+                        ),
+                    )
+                return records[:requested_rows]
+        return None
+
     if prefer_cache and not refresh:
-        cached = store.get_source_query(signature, max_age_seconds=max_cache_age_seconds)
-        if cached is not None:
-            return cached["records"]
+        cached_records = usable_cached_records(include_stale=False)
+        if cached_records is not None:
+            return cached_records
     if offline:
-        stale = store.get_source_query(signature, include_stale=True)
-        if stale is not None:
-            return [{**row, "cache_stale": True} for row in stale["records"]]
+        stale_records = usable_cached_records(include_stale=True)
+        if stale_records is not None:
+            return [{**row, "cache_stale": True} for row in stale_records]
         raise RuntimeError(f"Offline source cache miss: {signature}")
     try:
         records = CninfoClient().search_filings(
@@ -82,13 +158,39 @@ def search_a_filings(
             start_date=start_date,
             end_date=end_date,
             keyword=keyword,
-            max_rows=max_rows,
+            max_rows=fetch_rows,
         )
         rows = [record.to_dict() for record in records]
-    except Exception:
-        stale = store.get_source_query(signature, include_stale=True)
-        if stale is not None:
-            return [{**row, "cache_stale": True} for row in stale["records"]]
+    except Exception as exc:
+        stale_records = usable_cached_records(include_stale=True)
+        if stale_records is not None and (
+            stale_records or not isinstance(exc, CninfoSourceLookupError)
+        ):
+            timeout_recovery = isinstance(exc, CninfoLookupTimeoutError)
+            source_error = (
+                exc if isinstance(exc, CninfoSourceLookupError) else None
+            )
+            return [
+                {
+                    **row,
+                    "cache_stale": True,
+                    **(
+                        {
+                            "source_lookup_recovered": True,
+                            "source_lookup_error_code": source_error.code,
+                            "source_lookup_error": str(exc),
+                        }
+                        if source_error is not None
+                        else {}
+                    ),
+                    **(
+                        {"source_timeout_recovered": True}
+                        if timeout_recovery
+                        else {}
+                    ),
+                }
+                for row in stale_records
+            ]
         raise
     _persist_filings(rows)
     store.put_source_query(
@@ -97,7 +199,7 @@ def search_a_filings(
         source="CNINFO",
         ttl_seconds=source_ttl_seconds("CNINFO", max_cache_age_seconds),
     )
-    return _records_with_local_links(store, signature, rows)
+    return _records_with_local_links(store, signature, rows)[:requested_rows]
 
 
 def search_a_annual_report(
@@ -123,7 +225,7 @@ def search_a_annual_report(
         "年报",
         start_date,
         end_date,
-        max_rows=200,
+        max_rows=max(A_ANNUAL_SOURCE_FETCH_ROWS, max_rows),
         prefer_cache=prefer_cache,
         refresh=refresh,
         offline=offline,

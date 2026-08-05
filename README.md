@@ -9,7 +9,7 @@
 
 A local Python and MCP toolkit for A-share and H-share disclosures. It retrieves structured company data, locates and downloads annual reports, announcements, and prospectuses, ingests PDFs into a searchable local index, and supplies traceable evidence and verified calculations for AI-assisted financial analysis.
 
-> Current release: [`v1.1.2`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.2)
+> Current release: [`v1.1.3`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.3)
 >
 > This is not a market-data or trading-decision system. It does not provide real-time quotes, charts, order books, market timing, or investment advice.
 
@@ -50,13 +50,13 @@ Responsibility boundary:
 Download this asset from the [latest release](https://github.com/hc938456/ah-disclosure-kit/releases/latest):
 
 ```text
-ah-disclosure-kit-v1.1.2.zip
+ah-disclosure-kit-v1.1.3.zip
 ```
 
 Extract it to a stable directory and open Windows PowerShell in the extracted project directory:
 
 ```powershell
-Set-Location "C:\path\to\ah-disclosure-kit-v1.1.2"
+Set-Location "C:\path\to\ah-disclosure-kit-v1.1.3"
 ```
 
 For isolation from other Python tools, optionally create and activate a dedicated virtual environment before running the installer:
@@ -163,7 +163,7 @@ codex mcp list
 Expected version:
 
 ```text
-1.1.2
+1.1.3
 ```
 
 Treat the `data_dir` returned by `server-info` as authoritative. Do not infer it from the shell's current working directory.
@@ -286,7 +286,7 @@ The project is available under the [MIT License](./LICENSE). Use of source data 
 
 ## Release
 
-- Latest stable version: [`v1.1.2`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.2)
+- Latest stable version: [`v1.1.3`](https://github.com/hc938456/ah-disclosure-kit/releases/tag/v1.1.3)
 - Full change history: [CHANGELOG.md](./CHANGELOG.md)
 - Feedback and bug reports: [GitHub Issues](https://github.com/hc938456/ah-disclosure-kit/issues)
 

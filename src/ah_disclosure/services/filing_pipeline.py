@@ -8,6 +8,10 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from ah_disclosure.clients.cninfo_client import (
+    CninfoLookupTimeoutError,
+    CninfoSourceLookupError,
+)
 from ah_disclosure.clients.hkex_client import HkexClient, get_thread_hkex_client
 from ah_disclosure.core.file_utils import replace_file_with_retry
 from ah_disclosure.core.naming import (
@@ -500,8 +504,14 @@ def find_filing_source(
     rows: list[dict[str, Any]] = []
     source_cache_hit = False
     remote_source_queried = False
+    source_lookup_error_code: str | None = None
+    source_cache_recovered = False
+    source_timeout = False
+    source_timeout_recovered = False
+    source_timeout_error: str | None = None
     cache_lookup_ms = 0.0
     remote_lookup_ms = 0.0
+    cache_recovery_ms = 0.0
 
     if (prefer_cache or offline) and not refresh:
         cache_started = time.perf_counter()
@@ -527,28 +537,72 @@ def find_filing_source(
     candidates = _valid_candidates(rows)
     if not candidates and not offline and not source_cache_hit:
         remote_started = time.perf_counter()
-        rows = _search_source(
-            market,
-            symbol,
-            document_type,
-            report_year,
-            language,
-            hkex_stock_id,
-            max_rows,
-            offline=False,
-            refresh=True,
-            max_cache_age_seconds=max_cache_age_seconds,
-            company_name=company_name,
-        )
+        remote_source_queried = True
+        try:
+            rows = _search_source(
+                market,
+                symbol,
+                document_type,
+                report_year,
+                language,
+                hkex_stock_id,
+                max_rows,
+                offline=False,
+                refresh=True,
+                max_cache_age_seconds=max_cache_age_seconds,
+                company_name=company_name,
+            )
+        except CninfoSourceLookupError as exc:
+            source_lookup_error_code = exc.code
+            source_timeout = isinstance(exc, CninfoLookupTimeoutError)
+            source_timeout_error = str(exc)
+            recovery_started = time.perf_counter()
+            try:
+                rows = _search_source(
+                    market,
+                    symbol,
+                    document_type,
+                    report_year,
+                    language,
+                    hkex_stock_id,
+                    max_rows,
+                    offline=True,
+                    refresh=False,
+                    max_cache_age_seconds=max_cache_age_seconds,
+                    company_name=company_name,
+                )
+                source_cache_hit = True
+                source_cache_recovered = True
+                source_timeout_recovered = source_timeout
+            except RuntimeError:
+                rows = []
+            cache_recovery_ms = (time.perf_counter() - recovery_started) * 1000
         candidates = _valid_candidates(rows)
         remote_lookup_ms = (time.perf_counter() - remote_started) * 1000
-        remote_source_queried = True
-        source_cache_hit = False
+        source_recovery_rows = [
+            row for row in rows if row.get("source_lookup_recovered")
+        ]
+        if source_recovery_rows:
+            source_lookup_error_code = str(
+                source_recovery_rows[0].get("source_lookup_error_code")
+                or "cninfo_source_lookup_error"
+            )
+            source_cache_recovered = True
+            source_cache_hit = True
+            source_timeout = bool(
+                source_recovery_rows[0].get("source_timeout_recovered")
+            )
+            source_timeout_recovered = source_timeout
+            source_timeout_error = str(
+                source_recovery_rows[0].get("source_lookup_error") or ""
+            )
+        elif not source_timeout_recovered:
+            source_cache_hit = any(bool(row.get("cache_stale")) for row in rows)
 
     selection_started = time.perf_counter()
     selected, ambiguous = _select_candidate(candidates, document_type, report_year, language)
     selection_ms = (time.perf_counter() - selection_started) * 1000
-    return {
+    result: dict[str, Any] = {
         "ok": bool(candidates),
         "requested_symbol": requested_symbol,
         "resolved_symbol": symbol,
@@ -560,16 +614,30 @@ def find_filing_source(
             "run_id": run_id,
             "source_cache_hit": source_cache_hit,
             "remote_source_queried": remote_source_queried,
+            "source_lookup_error_code": source_lookup_error_code,
+            "source_cache_recovered": source_cache_recovered,
+            "source_timeout": source_timeout,
+            "source_timeout_recovered": source_timeout_recovered,
             "downloaded": False,
             "ingested": False,
             "timings_ms": {
                 "cache_lookup": round(cache_lookup_ms, 2),
                 "remote_lookup": round(remote_lookup_ms, 2),
+                "cache_recovery": round(cache_recovery_ms, 2),
                 "selection": round(selection_ms, 2),
                 "total": round((time.perf_counter() - started) * 1000, 2),
             },
         },
     }
+    if source_lookup_error_code and not candidates:
+        result["error_code"] = (
+            "source_lookup_timeout" if source_timeout else "source_lookup_error"
+        )
+        result["error"] = (
+            f"{source_timeout_error or 'CNINFO source lookup failed.'} "
+            "Automatic source-cache recovery found no reusable result."
+        )
+    return result
 
 
 def ensure_filing_evidence(
@@ -717,7 +785,8 @@ def ensure_filing_evidence(
         )
         return {
             **located,
-            "error": f"No unambiguous filing source was selected for {context}.",
+            "error": located.get("error")
+            or f"No unambiguous filing source was selected for {context}.",
         }
     paths = get_data_paths()
     output_dir = paths.raw_hkex if market.upper().startswith("H") else paths.raw_cninfo

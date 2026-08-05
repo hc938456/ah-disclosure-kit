@@ -102,6 +102,36 @@ def test_a_filing_refresh_bypasses_query_cache(monkeypatch, tmp_path):
     assert calls["count"] == 2
 
 
+def test_a_filing_cache_is_shared_across_row_limits(monkeypatch, tmp_path):
+    monkeypatch.setenv("AH_DISCLOSURE_DATA_DIR", str(tmp_path / "data"))
+    calls = []
+    records = [
+        FilingRecord(
+            **{
+                **_filing().to_dict(),
+                "title": f"2024 年年度报告 {index}",
+                "pdf_url": f"https://example.com/a-{index}.pdf",
+                "detail_url": f"https://example.com/a-{index}.pdf",
+                "raw_id": str(index),
+            }
+        )
+        for index in range(disclosure_service.A_SOURCE_CACHE_FETCH_ROWS)
+    ]
+
+    def fake_search(self, **kwargs):
+        calls.append(kwargs["max_rows"])
+        return records[: kwargs["max_rows"]]
+
+    monkeypatch.setattr(disclosure_service.CninfoClient, "search_filings", fake_search)
+
+    first = disclosure_service.search_a_filings("600519", max_rows=20)
+    second = disclosure_service.search_a_filings("600519", max_rows=10)
+
+    assert len(first) == 20
+    assert len(second) == 10
+    assert calls == [disclosure_service.A_SOURCE_CACHE_FETCH_ROWS]
+
+
 def test_a_filing_refresh_preserves_linked_local_pdf(monkeypatch, tmp_path):
     monkeypatch.setenv("AH_DISCLOSURE_DATA_DIR", str(tmp_path / "data"))
     record = _filing().to_dict()
@@ -216,6 +246,50 @@ def test_remote_failure_returns_stale_cache(monkeypatch, tmp_path):
     rows = disclosure_service.search_a_filings("600519", max_rows=5, refresh=True)
 
     assert rows[0]["cache_stale"] is True
+
+
+def test_cninfo_timeout_marks_stale_cache_recovery(monkeypatch, tmp_path):
+    monkeypatch.setenv("AH_DISCLOSURE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(
+        disclosure_service.CninfoClient,
+        "search_filings",
+        lambda self, **kwargs: [_filing()],
+    )
+    disclosure_service.search_a_filings("300502", max_rows=5)
+
+    def timeout(self, **kwargs):
+        raise disclosure_service.CninfoLookupTimeoutError(
+            "CNINFO timed out",
+            operation="announcement query",
+            budget_seconds=40,
+        )
+
+    monkeypatch.setattr(disclosure_service.CninfoClient, "search_filings", timeout)
+    rows = disclosure_service.search_a_filings("300502", max_rows=5, refresh=True)
+
+    assert rows[0]["cache_stale"] is True
+    assert rows[0]["source_timeout_recovered"] is True
+    assert rows[0]["source_lookup_error"] == "CNINFO timed out"
+
+
+def test_a_annual_report_uses_bounded_discovery_window(monkeypatch):
+    captured = {}
+
+    def fake_search(*args, **kwargs):
+        captured.update(kwargs)
+        return [{"title": "新易盛2025年年度报告"}]
+
+    monkeypatch.setattr(disclosure_service, "search_a_filings", fake_search)
+
+    rows = disclosure_service.search_a_annual_report(
+        "300502",
+        report_year=2025,
+        max_rows=10,
+        prefer_cache=False,
+    )
+
+    assert rows == [{"title": "新易盛2025年年度报告"}]
+    assert captured["max_rows"] == disclosure_service.A_ANNUAL_SOURCE_FETCH_ROWS
 
 
 def test_h_prospectus_stops_after_first_direct_pdf(monkeypatch):

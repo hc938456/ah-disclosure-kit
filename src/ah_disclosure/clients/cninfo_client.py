@@ -47,6 +47,30 @@ HEADERS = {
 }
 
 
+class CninfoSourceLookupError(RuntimeError):
+    """Raised when a CNINFO source request fails before results are available."""
+
+    code = "cninfo_source_lookup_error"
+    source = "CNINFO"
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        operation: str,
+        budget_seconds: float,
+    ) -> None:
+        super().__init__(message)
+        self.operation = operation
+        self.budget_seconds = float(budget_seconds)
+
+
+class CninfoLookupTimeoutError(CninfoSourceLookupError, TimeoutError):
+    """Raised when a CNINFO source lookup exhausts its bounded network budget."""
+
+    code = "cninfo_source_lookup_timeout"
+
+
 def _org_map_cache_path() -> Path:
     return get_data_paths().cache_resolver / "cninfo_org_map.json"
 
@@ -116,10 +140,78 @@ def _detail_url(symbol: str, announcement_id: str, org_id: str, publish_time: st
 
 
 class CninfoClient:
-    def __init__(self, timeout: int = 30) -> None:
-        self.timeout = timeout
+    def __init__(
+        self,
+        timeout: float | None = None,
+        lookup_budget: float | None = None,
+    ) -> None:
+        settings = get_settings()
+        self.timeout = float(
+            settings.cninfo_request_timeout_seconds if timeout is None else timeout
+        )
+        self.lookup_budget = float(
+            settings.cninfo_lookup_budget_seconds
+            if lookup_budget is None
+            else lookup_budget
+        )
+        if self.timeout <= 0:
+            raise ValueError("CNINFO request timeout must be greater than zero")
+        if self.lookup_budget <= 0:
+            raise ValueError("CNINFO lookup budget must be greater than zero")
+        self._deadline: float | None = None
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
+
+    def _timeout_for_request(self, operation: str) -> float:
+        if self._deadline is None:
+            return self.timeout
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise CninfoLookupTimeoutError(
+                f"CNINFO source lookup exceeded its {self.lookup_budget:g}s internal "
+                f"budget before {operation}.",
+                operation=operation,
+                budget_seconds=self.lookup_budget,
+            )
+        return min(self.timeout, max(remaining, 0.01))
+
+    def _request(self, operation: str, method: Any, url: str, **kwargs: Any) -> Any:
+        timeout = self._timeout_for_request(operation)
+        try:
+            response = method(url, timeout=timeout, **kwargs)
+            response.raise_for_status()
+        except requests.Timeout as exc:
+            raise CninfoLookupTimeoutError(
+                f"CNINFO timed out during {operation}; the request was bounded to "
+                f"{timeout:g}s and the complete lookup budget is {self.lookup_budget:g}s.",
+                operation=operation,
+                budget_seconds=self.lookup_budget,
+            ) from exc
+        except requests.RequestException as exc:
+            raise CninfoSourceLookupError(
+                f"CNINFO request failed during {operation} "
+                f"({type(exc).__name__}). Check network and proxy availability.",
+                operation=operation,
+                budget_seconds=self.lookup_budget,
+            ) from exc
+        if self._deadline is not None and time.monotonic() > self._deadline:
+            raise CninfoLookupTimeoutError(
+                f"CNINFO source lookup exceeded its {self.lookup_budget:g}s internal "
+                f"budget during {operation}.",
+                operation=operation,
+                budget_seconds=self.lookup_budget,
+            )
+        return response
+
+    def _response_json(self, response: Any, operation: str) -> Any:
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise CninfoSourceLookupError(
+                f"CNINFO returned invalid JSON during {operation}.",
+                operation=operation,
+                budget_seconds=self.lookup_budget,
+            ) from exc
 
     @lru_cache(maxsize=32)
     def get_stock_org_map(self, market: str = "沪深京") -> dict[str, str]:
@@ -127,11 +219,16 @@ class CninfoClient:
             cached = _read_org_map_cache()
             if cached:
                 return cached
-        resp = self.session.get(CNINFO_STOCK_URLS[market], timeout=self.timeout)
-        resp.raise_for_status()
+        resp = self._request(
+            "stock-code resolver",
+            self.session.get,
+            CNINFO_STOCK_URLS[market],
+        )
         mapping = {
             str(item.get("code")): str(item.get("orgId"))
-            for item in resp.json().get("stockList", [])
+            for item in self._response_json(resp, "stock-code resolver").get(
+                "stockList", []
+            )
             if item.get("code") and item.get("orgId")
         }
         if market == "沪深京":
@@ -140,13 +237,13 @@ class CninfoClient:
 
     def lookup_stock_org_id(self, symbol: str) -> str | None:
         code = str(symbol).strip()
-        resp = self.session.post(
+        resp = self._request(
+            "stock-code fallback resolver",
+            self.session.post,
             CNINFO_TOP_SEARCH_URL,
             data={"keyWord": code, "maxNum": "10"},
-            timeout=self.timeout,
         )
-        resp.raise_for_status()
-        rows = resp.json()
+        rows = self._response_json(resp, "stock-code fallback resolver")
         for item in rows if isinstance(rows, list) else []:
             if str(item.get("code") or "").strip() == code and item.get("orgId"):
                 org_id = str(item["orgId"])
@@ -168,52 +265,69 @@ class CninfoClient:
         page_size: int = 30,
         max_pages: int | None = None,
     ) -> list[FilingRecord]:
-        stock_item = ""
-        if symbol:
-            org_id = self.get_stock_org_map(market).get(str(symbol).strip())
-            if not org_id and market == "沪深京":
-                org_id = self.lookup_stock_org_id(str(symbol).strip())
-            if not org_id:
-                raise ValueError(f"Cannot resolve CNINFO orgId for symbol={symbol!r}")
-            stock_item = f"{symbol},{org_id}"
-        end_date = end_date or current_date_yyyymmdd()
-        payload = {
-            "pageNum": "1",
-            "pageSize": str(page_size),
-            "column": COLUMN_MAP.get(market, "szse"),
-            "tabName": "fulltext",
-            "plate": "",
-            "stock": stock_item,
-            "searchkey": keyword or "",
-            "secid": "",
-            "category": CATEGORY_MAP.get(category, category if category.startswith("category_") else ""),
-            "trade": "",
-            "seDate": f"{_date(start_date)}~{_date(end_date)}",
-            "sortName": "",
-            "sortType": "",
-            "isHLtitle": "true",
-        }
-        first = self._post(payload)
-        total = int(first.get("totalAnnouncement") or 0)
-        if total <= 0:
-            return []
-        pages = math.ceil(total / page_size)
-        if max_pages is not None:
-            pages = min(pages, max_pages)
-        records: list[FilingRecord] = []
-        for page in range(1, pages + 1):
-            payload["pageNum"] = str(page)
-            data = first if page == 1 else self._post(payload)
-            for item in data.get("announcements", []) or []:
-                records.append(self._normalize(item, category))
-                if len(records) >= max_rows:
-                    return records
-        return records
+        previous_deadline = self._deadline
+        lookup_deadline = time.monotonic() + self.lookup_budget
+        self._deadline = (
+            min(previous_deadline, lookup_deadline)
+            if previous_deadline is not None
+            else lookup_deadline
+        )
+        try:
+            stock_item = ""
+            if symbol:
+                org_id = self.get_stock_org_map(market).get(str(symbol).strip())
+                if not org_id and market == "沪深京":
+                    org_id = self.lookup_stock_org_id(str(symbol).strip())
+                if not org_id:
+                    raise ValueError(f"Cannot resolve CNINFO orgId for symbol={symbol!r}")
+                stock_item = f"{symbol},{org_id}"
+            end_date = end_date or current_date_yyyymmdd()
+            payload = {
+                "pageNum": "1",
+                "pageSize": str(page_size),
+                "column": COLUMN_MAP.get(market, "szse"),
+                "tabName": "fulltext",
+                "plate": "",
+                "stock": stock_item,
+                "searchkey": keyword or "",
+                "secid": "",
+                "category": CATEGORY_MAP.get(
+                    category,
+                    category if category.startswith("category_") else "",
+                ),
+                "trade": "",
+                "seDate": f"{_date(start_date)}~{_date(end_date)}",
+                "sortName": "",
+                "sortType": "",
+                "isHLtitle": "true",
+            }
+            first = self._post(payload)
+            total = int(first.get("totalAnnouncement") or 0)
+            if total <= 0:
+                return []
+            pages = math.ceil(total / page_size)
+            if max_pages is not None:
+                pages = min(pages, max_pages)
+            records: list[FilingRecord] = []
+            for page in range(1, pages + 1):
+                payload["pageNum"] = str(page)
+                data = first if page == 1 else self._post(payload)
+                for item in data.get("announcements", []) or []:
+                    records.append(self._normalize(item, category))
+                    if len(records) >= max_rows:
+                        return records
+            return records
+        finally:
+            self._deadline = previous_deadline
 
     def _post(self, payload: dict[str, str]) -> dict[str, Any]:
-        resp = self.session.post(CNINFO_QUERY_URL, data=payload, timeout=self.timeout)
-        resp.raise_for_status()
-        return resp.json()
+        resp = self._request(
+            "announcement query",
+            self.session.post,
+            CNINFO_QUERY_URL,
+            data=payload,
+        )
+        return self._response_json(resp, "announcement query")
 
     def _normalize(self, item: dict[str, Any], category: str) -> FilingRecord:
         symbol = str(item.get("secCode") or "")

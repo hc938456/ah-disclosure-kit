@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from ah_disclosure.clients.cninfo_client import (
+    CninfoLookupTimeoutError,
+    CninfoSourceLookupError,
+)
 from ah_disclosure.services import filing_pipeline
 from ah_disclosure.models import PdfPage
 from ah_disclosure.pdf.downloader import file_sha256
@@ -37,6 +41,90 @@ def test_find_filing_source_reports_remote_lookup(monkeypatch):
     assert result["execution_info"]["timings_ms"]["remote_lookup"] >= 0
     assert result["execution_info"]["timings_ms"]["selection"] >= 0
     assert calls == [(True, False), (False, True)]
+
+
+def test_find_filing_source_recovers_from_cache_after_cninfo_timeout(monkeypatch):
+    calls = []
+
+    def fake_search(*args, offline=False, refresh=False, **kwargs):
+        calls.append((offline, refresh))
+        if len(calls) == 1:
+            raise RuntimeError("cache miss")
+        if not offline:
+            raise CninfoLookupTimeoutError(
+                "CNINFO timed out",
+                operation="announcement query",
+                budget_seconds=40,
+            )
+        return [
+            {
+                **_candidate(),
+                "market": "A",
+                "symbol": "300502",
+                "source": "CNINFO",
+            }
+        ]
+
+    monkeypatch.setattr(filing_pipeline, "_search_source", fake_search)
+
+    result = filing_pipeline.find_filing_source(
+        "A", "300502", "annual_report", 2024
+    )
+
+    assert result["ok"] is True
+    assert result["execution_info"]["source_timeout"] is True
+    assert result["execution_info"]["source_timeout_recovered"] is True
+    assert result["execution_info"]["source_cache_hit"] is True
+    assert result["execution_info"]["timings_ms"]["cache_recovery"] >= 0
+    assert calls == [(True, False), (False, True), (True, False)]
+
+
+def test_find_filing_source_returns_actionable_timeout_without_cache(monkeypatch):
+    def fake_search(*args, offline=False, **kwargs):
+        if offline:
+            raise RuntimeError("cache miss")
+        raise CninfoLookupTimeoutError(
+            "CNINFO timed out",
+            operation="announcement query",
+            budget_seconds=40,
+        )
+
+    monkeypatch.setattr(filing_pipeline, "_search_source", fake_search)
+
+    result = filing_pipeline.find_filing_source(
+        "A", "300502", "annual_report", 2025
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "source_lookup_timeout"
+    assert "Automatic source-cache recovery" in result["error"]
+    assert result["execution_info"]["source_timeout"] is True
+    assert result["execution_info"]["source_timeout_recovered"] is False
+
+
+def test_find_filing_source_returns_actionable_network_error_without_cache(monkeypatch):
+    def fake_search(*args, offline=False, **kwargs):
+        if offline:
+            raise RuntimeError("cache miss")
+        raise CninfoSourceLookupError(
+            "CNINFO proxy unavailable",
+            operation="stock-code resolver",
+            budget_seconds=40,
+        )
+
+    monkeypatch.setattr(filing_pipeline, "_search_source", fake_search)
+
+    result = filing_pipeline.find_filing_source(
+        "A", "300502", "annual_report", 2025
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "source_lookup_error"
+    assert result["execution_info"]["source_lookup_error_code"] == (
+        "cninfo_source_lookup_error"
+    )
+    assert result["execution_info"]["source_timeout"] is False
+    assert result["execution_info"]["source_cache_recovered"] is False
 
 
 def test_find_filing_source_selects_latest_annual_report_when_year_is_omitted(monkeypatch):

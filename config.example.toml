@@ -9,6 +9,12 @@ hkex_ttl_days = 1
 historical_filing_ttl_days = 30
 resolver_ttl_days = 90
 
+[network]
+# Bound each CNINFO HTTP request and the complete source-lookup stage well below
+# common MCP host timeouts. A timed-out lookup automatically probes source cache.
+cninfo_request_timeout_seconds = 10
+cninfo_lookup_budget_seconds = 40
+
 [pdf]
 default_ingest_mode = "auto"
 generate_markdown = false

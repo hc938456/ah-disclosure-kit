@@ -250,9 +250,17 @@ def get_financial_statements_tool(market: str, symbol: str, statement: str = "al
 
 
 @mcp.tool()
-def get_financial_indicators_tool(market: str, symbol: str, max_rows: int | None = 200) -> dict[str, Any]:
-    """Get financial indicators via AKShare-backed provider."""
-    return get_financial_indicators(market, symbol, max_rows=max_rows)
+def get_financial_indicators_tool(
+    market: str,
+    symbol: str,
+    max_rows: int | None = 200,
+    start_year: str | None = None,
+) -> dict[str, Any]:
+    """Get financial indicators; start_year limits A-share history."""
+    params: dict[str, Any] = {"max_rows": max_rows}
+    if start_year is not None and not market.upper().startswith("H"):
+        params["start_year"] = str(start_year)
+    return get_financial_indicators(market, symbol, **params)
 
 
 @mcp.tool()
@@ -262,9 +270,21 @@ def get_dividends_tool(market: str, symbol: str, max_rows: int | None = 200) -> 
 
 
 @mcp.tool()
-def get_shareholders_tool(market: str, symbol: str, data_type: str = "shareholder_count", max_rows: int | None = 200) -> dict[str, Any]:
-    """Get shareholder-related data. H-share may require filings when no structured wrapper is available."""
-    return get_shareholders(market, symbol, data_type=data_type, max_rows=max_rows)
+def get_shareholders_tool(
+    market: str,
+    symbol: str,
+    data_type: str = "shareholder_count",
+    max_rows: int | None = 200,
+    date: str | None = None,
+) -> dict[str, Any]:
+    """Get shareholder data; date optionally selects an A-share top-holder period."""
+    params: dict[str, Any] = {
+        "data_type": data_type,
+        "max_rows": max_rows,
+    }
+    if date is not None and data_type == "top_float_shareholders":
+        params["date"] = date
+    return get_shareholders(market, symbol, **params)
 
 
 @mcp.tool()
