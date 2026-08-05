@@ -10,6 +10,7 @@ This release publishes the local post-v1.1.2 implementation updates while keepin
 - Added staged cold-start filing preparation and HKEX alternate-language fallback for broken or unusable Chinese PDF text layers.
 - Expanded A-share and AKShare parameter forwarding, cache behavior, configuration controls, and filing-pipeline validation.
 - Updated the `akshare` company-data dependency floor to `1.18.81`.
+- Kept the validated Ruff and MCP toolchain within the supported compatibility ranges (`ruff<0.16`, `mcp<2.0`).
 - Added regression coverage for source-cache recovery, filing selection, A-share data forwarding, and MCP company-data options.
 - Validated with 309 tests, Ruff, Mypy, and Python compilation.
 
@@ -209,6 +210,6 @@ Highlights:
 ---
 **Document created:** 2026-07-03 19:31
 
-**Last modified:** 2026-08-05 00:26
+**Last modified:** 2026-08-05 09:56
 
 **Last modified model:** OpenAI GPT
