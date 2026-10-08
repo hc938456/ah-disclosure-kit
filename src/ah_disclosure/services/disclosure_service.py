@@ -580,6 +580,8 @@ def _matches_h_annual_report_year(row: dict, report_year: int) -> bool:
     english_patterns = [
         rf"\b{re.escape(year)}\s+ANNUAL\s+REPORT\b",
         rf"\bANNUAL\s+REPORT(?:\s+AND\s+ACCOUNTS)?\s+{re.escape(year)}\b",
+        # 港交所非自然财年跨财年写法（2024/25）：前一年任意，后一年须等于 report_year
+        rf"\b{_h_fiscal_year_span_pattern(report_year)}\s+ANNUAL\s+REPORT\b",
     ]
     if any(re.search(pattern, title) for pattern in english_patterns):
         return True
@@ -605,6 +607,18 @@ def _file_size_from_hkex_label(value: object) -> int | None:
         return None
     multiplier = {"KB": 1024, "MB": 1024**2, "GB": 1024**3}[match.group(2).upper()]
     return int(float(match.group(1)) * multiplier)
+
+
+def _h_fiscal_year_span_pattern(report_year: int | None) -> str:
+    """匹配港交所非自然财年的跨财年写法（如 2024/25、2024/2025）。
+
+    港交所大量非 12 月结公司（3 月/6 月/9 月结）的年报标题写成 "2024/25 Annual Report"，
+    其中**后一个年份**才是报告所属财年的结束年。这里把结束年锚定到 report_year，
+    避免把 "2025/26" 误判成 2025 年报告。
+    """
+    if report_year is None:
+        return r"(?:19|20)\d{2}[/-](?:\d{2}|(?:19|20)\d{2})"
+    return rf"(?:19|20)\d{{2}}[/-](?:{report_year % 100:02d}|{report_year})"
 
 
 def _is_high_confidence_h_annual_report(
@@ -633,9 +647,11 @@ def _is_high_confidence_h_annual_report(
         return False
     year_pattern = str(report_year) if report_year is not None else r"(?:19|20)\d{2}"
     if lang.upper().startswith("EN"):
+        span_pattern = _h_fiscal_year_span_pattern(report_year)
         patterns = (
             rf"^(?:fiscal year )?{year_pattern} annual report(?: and accounts)?(?:\s*\([^)]*\))?$",
             rf"^annual report(?: and accounts)? {year_pattern}(?:\s*\([^)]*\))?$",
+            rf"^(?:fiscal year )?{span_pattern} annual report(?: and accounts)?(?:\s*\([^)]*\))?$",
         )
         return any(re.fullmatch(pattern, folded, flags=re.IGNORECASE) for pattern in patterns)
     compact = re.sub(r"\s+", "", title)
