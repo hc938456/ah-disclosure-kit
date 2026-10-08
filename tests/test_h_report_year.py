@@ -173,3 +173,49 @@ def test_uncertain_cached_title_result_requires_broad_cache(monkeypatch, tmp_pat
         assert "cache miss" in str(exc)
     else:
         raise AssertionError("uncertain partial cache should not be treated as complete")
+
+
+def test_h_annual_report_year_matches_cross_fiscal_year_title():
+    """非自然财年（3/6/9 月结）的年报标题写成 "2024/25 Annual Report"。
+
+    港交所大量非 12 月结发行人使用该跨财年写法，后一个年份为财年结束年。
+    """
+    assert disclosure_service._matches_h_annual_report_year(
+        {"title": "2024/25 Annual Report"}, 2025
+    )
+    assert disclosure_service._matches_h_annual_report_year(
+        {"title": "2024/2025 Annual Report"}, 2025
+    )
+    assert disclosure_service._matches_h_annual_report_year(
+        {"title": "2025/26 ANNUAL REPORT"}, 2026
+    )
+
+
+def test_h_annual_report_year_anchors_cross_fiscal_year_end():
+    """跨财年写法必须按结束年归属，不能被起始年误取。"""
+    assert not disclosure_service._matches_h_annual_report_year(
+        {"title": "2024/25 Annual Report"}, 2024
+    )
+    assert not disclosure_service._matches_h_annual_report_year(
+        {"title": "2025/26 ANNUAL REPORT"}, 2025
+    )
+
+
+def test_high_confidence_accepts_cross_fiscal_year_report():
+    """高置信门禁须接受跨财年年报，并保持 ≥1MB 的体积护栏。"""
+    assert disclosure_service._is_high_confidence_h_annual_report(
+        {"title": "2024/25 Annual Report", "file_size_label": "17MB"}, 2025, "EN"
+    )
+    assert disclosure_service._is_high_confidence_h_annual_report(
+        {"title": "2024/25 Annual Report (with employee share plans)",
+         "file_size_label": "17MB"}, 2025, "EN"
+    )
+    # 通知函虽含 "Annual Report" 字样，仍应被拒绝
+    assert not disclosure_service._is_high_confidence_h_annual_report(
+        {"title": "Letter to Non-Registered Holders - Notification of Publication "
+                  "of 2024/2025 Annual Report", "file_size_label": "206KB"}, 2025, "EN"
+    )
+    # 跨财年锚定 + 体积护栏同时生效
+    assert not disclosure_service._is_high_confidence_h_annual_report(
+        {"title": "2025/26 ANNUAL REPORT", "file_size_label": "46MB"}, 2025, "EN"
+    )
